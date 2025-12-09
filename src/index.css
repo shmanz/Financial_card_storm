@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global background to mimic a dark banking dashboard battlefield */
+body {
+  @apply bg-slate-900 text-slate-100;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+
+
+
+
+
+

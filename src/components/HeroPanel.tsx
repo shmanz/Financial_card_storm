@@ -1,0 +1,138 @@
+import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { StatusEffect } from '../types/game';
+
+interface HeroPanelProps {
+  name: string;
+  hp: number;
+  maxHp: number;
+  shield?: number;
+  statusEffects?: StatusEffect[];
+  description?: string;
+  isBoss?: boolean;
+}
+
+// 상태 효과 아이콘 매핑
+const STATUS_ICONS: Record<string, string> = {
+  STUN: '😵',
+  ATTACK_BUFF: '⚔️↑',
+  ATTACK_DEBUFF: '⚔️↓',
+  DAMAGE_REDUCTION: '🛡️',
+  ENERGY_NEXT_TURN: '⚡',
+  DOT_DAMAGE: '🔥',
+  HOT_HEAL: '💚'
+};
+
+export const HeroPanel: React.FC<HeroPanelProps> = ({
+  name,
+  hp,
+  maxHp,
+  shield = 0,
+  statusEffects = [],
+  description,
+  isBoss
+}) => {
+  const ratio = Math.max(0, Math.min(1, hp / maxHp));
+  const isLowHp = ratio < 0.3;
+
+  return (
+    <motion.div
+      className={`flex flex-col rounded-2xl border px-4 py-3 shadow-md ${
+        isBoss
+          ? 'border-rose-500/60 bg-gradient-to-b from-rose-900/70 to-slate-900/80'
+          : 'border-cyan-500/60 bg-gradient-to-b from-slate-800 to-slate-900'
+      }`}
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          {/* 캐릭터 아이콘 */}
+          <motion.div
+            className={`flex h-10 w-10 items-center justify-center rounded-full text-lg font-bold ${
+              isBoss ? 'bg-rose-400 text-rose-950' : 'bg-cyan-400 text-cyan-950'
+            }`}
+            animate={isLowHp ? { scale: [1, 1.1, 1] } : {}}
+            transition={{ repeat: Infinity, duration: 1 }}
+          >
+            {isBoss ? '👹' : '🧑'}
+          </motion.div>
+
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-slate-50">{name}</span>
+            {description && (
+              <span className="text-[10px] text-slate-200/80">{description}</span>
+            )}
+          </div>
+        </div>
+
+        {/* HP 표시 */}
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center gap-1 text-sm font-semibold text-slate-50">
+            <span>HP</span>
+            <motion.span
+              className={`rounded-full px-2 py-0.5 text-xs ${
+                isBoss ? 'bg-rose-500/80' : 'bg-cyan-500/80'
+              } text-slate-950`}
+              animate={isLowHp ? { backgroundColor: ['#ef4444', '#dc2626', '#ef4444'] } : {}}
+              transition={{ repeat: Infinity, duration: 0.8 }}
+            >
+              {hp}/{maxHp}
+            </motion.span>
+          </div>
+
+          {/* 실드 표시 */}
+          {shield > 0 && (
+            <motion.div
+              className="flex items-center gap-1 text-xs font-semibold text-sky-300"
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0 }}
+            >
+              <span>🛡️</span>
+              <span className="rounded bg-sky-500/30 px-1.5 py-0.5">{shield}</span>
+            </motion.div>
+          )}
+        </div>
+      </div>
+
+      {/* HP 바 */}
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
+        <motion.div
+          className={`h-full rounded-full ${
+            isLowHp
+              ? 'bg-red-500'
+              : isBoss
+              ? 'bg-rose-400'
+              : 'bg-cyan-400'
+          } transition-all duration-300`}
+          initial={{ width: 0 }}
+          animate={{ width: `${ratio * 100}%` }}
+          transition={{ duration: 0.5 }}
+        />
+      </div>
+
+      {/* 상태 효과 아이콘 */}
+      {statusEffects.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          <AnimatePresence>
+            {statusEffects.map((effect, idx) => (
+              <motion.div
+                key={`${effect.type}-${idx}`}
+                className="flex items-center gap-0.5 rounded-full bg-slate-700/80 px-2 py-0.5 text-[9px] text-amber-300"
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                exit={{ scale: 0, rotate: 180 }}
+                transition={{ duration: 0.3 }}
+              >
+                <span>{STATUS_ICONS[effect.type] || '✨'}</span>
+                <span>{effect.remainingTurns}턴</span>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
+    </motion.div>
+  );
+};
