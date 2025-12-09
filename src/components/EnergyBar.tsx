@@ -14,10 +14,10 @@ export const EnergyBar: React.FC<EnergyBarProps> = ({ current, max, cap = MAX_CR
   const clampedCurrent = Math.min(current, clampedMax);
 
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-1 rounded-xl border border-cyan-500/60 bg-slate-900/80 px-1.5 py-2 sm:gap-2 sm:rounded-2xl sm:px-2 sm:py-3">
-      <div className="text-[10px] font-semibold text-cyan-200 sm:text-xs">에너지</div>
+    <div className="flex h-full flex-col items-center justify-center gap-0.5 rounded-lg border border-cyan-500/60 bg-slate-900/80 px-1 py-1.5 sm:gap-2 sm:rounded-2xl sm:px-2 sm:py-3">
+      <div className="text-[8px] font-semibold text-cyan-200 sm:text-xs">E</div>
       <motion.div
-        className="text-xs font-bold text-cyan-100 sm:text-sm"
+        className="text-[10px] font-bold text-cyan-100 sm:text-sm"
         key={clampedCurrent}
         initial={{ scale: 1.5, color: '#38bdf8' }}
         animate={{ scale: 1, color: '#e0f2fe' }}
@@ -33,7 +33,7 @@ export const EnergyBar: React.FC<EnergyBarProps> = ({ current, max, cap = MAX_CR
           return (
             <motion.div
               key={slot}
-              className={`h-3 w-4 rounded-sm border text-[8px] sm:h-4 sm:w-5 sm:text-[9px] ${
+              className={`h-2.5 w-3 rounded-sm border sm:h-4 sm:w-5 ${
                 filled
                   ? 'border-cyan-400 bg-cyan-400/70 shadow shadow-cyan-400/40'
                   : unlocked

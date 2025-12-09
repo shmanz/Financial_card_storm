@@ -399,8 +399,8 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        {/* Debug Info (개발용) */}
-        <div className="mb-2 rounded border border-yellow-500/50 bg-yellow-900/20 p-2 text-xs text-yellow-200">
+        {/* Debug Info (개발용) - 모바일에서 숨김 */}
+        <div className="hidden mb-2 rounded border border-yellow-500/50 bg-yellow-900/20 p-2 text-xs text-yellow-200 sm:block">
           <strong>디버그:</strong> 현재 화면 = {screen} | 사용자 = {currentUser.name} | 거래 = {currentUser.transactions.length}건 | <strong>전체 카드 = {allCards.length}/100장</strong> | <strong>전투 덱 = {battleDeck.length}/30장</strong> {selectedDeck.length > 0 && '(사용자 선택)'} | 구매 카드 = {currentUser.purchasedCards?.length || 0}장 | 피로도 = {state?.fatigue || 0}
         </div>
 

@@ -240,14 +240,14 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
   if (!currentUser) return null;
 
   return (
-    <div className="flex min-h-screen flex-col gap-2 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-2 sm:gap-3 sm:p-4">
+    <div className="flex h-screen max-h-screen flex-col gap-1 overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-1 sm:gap-3 sm:p-4">
       {/* 디버그 정보 - 모바일에서 숨김 */}
       <div className="hidden rounded border border-purple-500/50 bg-purple-900/20 p-2 text-xs text-purple-200 sm:block">
         <strong>PvP 디버그:</strong> 내 턴 = {isMyTurn ? 'YES' : 'NO'} | 턴 #{gameState.turn} | 모드 = {gameState.gameMode} | 피로도 = {gameState.fatigue}
       </div>
 
       {/* 상단: 상대 플레이어 (기존 보스 위치) */}
-      <section className="flex items-start justify-between gap-2 sm:gap-3">
+      <section className="flex items-start justify-between gap-1.5 flex-shrink-0 sm:gap-3">
         <div className="flex-1 min-w-0">
           <HeroPanel
             isBoss
@@ -259,27 +259,22 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
             description="상대 플레이어"
           />
         </div>
-        <div className="text-right text-[10px] text-slate-300 sm:text-[11px] flex-shrink-0">
-          <div>턴 {gameState.turn}</div>
-          <div className={`font-semibold text-xs sm:text-sm ${isMyTurn ? 'text-cyan-300' : 'text-rose-300'}`}>
-            {isMyTurn ? '⚔️ 내 턴!' : '⏳ 상대 턴'}
+        <div className="text-right text-[9px] text-slate-300 flex-shrink-0 sm:text-[11px]">
+          <div className="font-semibold">턴 {gameState.turn}</div>
+          <div className={`font-bold text-[10px] sm:text-sm ${isMyTurn ? 'text-cyan-300' : 'text-rose-300'}`}>
+            {isMyTurn ? '⚔️' : '⏳'}
           </div>
-          <div className="mt-1 text-[9px] sm:text-[10px]">에너지: {opponentEnergy}</div>
-          <div className="mt-1 text-[9px] sm:text-[10px]">덱: {gameState.deck.length}</div>
-          {gameState.fatigue > 0 && (
-            <div className="mt-1 text-red-400 font-semibold text-[9px] sm:text-[10px]">
-              ⚠️ {gameState.fatigue}
-            </div>
-          )}
+          <div className="mt-0.5 text-[8px] sm:text-[10px]">E:{opponentEnergy}</div>
+          <div className="mt-0.5 text-[8px] sm:text-[10px]">D:{gameState.deck.length}</div>
         </div>
       </section>
 
       {/* 중앙: 전장 + 사이드바 */}
-      <section className="flex flex-1 flex-col gap-2 sm:gap-3 md:flex-row">
+      <section className="flex flex-1 min-h-0 flex-col gap-1 sm:gap-3 md:flex-row overflow-hidden">
         {/* 전장 + 로그 */}
-        <div className="flex-1 space-y-2 sm:space-y-3">
-          <div className="rounded-xl border border-slate-700/80 bg-gradient-to-b from-slate-800/80 via-slate-900/90 to-slate-950 p-2 sm:rounded-2xl sm:p-3">
-            <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-900/70 sm:h-32 sm:rounded-xl">
+        <div className="flex flex-1 min-h-0 flex-col space-y-1 sm:space-y-3">
+          <div className="rounded-lg border border-slate-700/80 bg-gradient-to-b from-slate-800/80 via-slate-900/90 to-slate-950 p-1 flex-shrink-0 sm:rounded-2xl sm:p-3">
+            <div className="flex h-12 items-center justify-center rounded border border-dashed border-slate-700 bg-slate-900/70 sm:h-32 sm:rounded-xl">
               {isMyTurn ? (
                 <motion.div
                   className="text-center"
@@ -287,59 +282,55 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
                   animate={{ scale: 1 }}
                   transition={{ repeat: Infinity, duration: 1, repeatType: 'reverse' }}
                 >
-                  <div className="text-xl sm:text-2xl">⚔️</div>
-                  <div className="mt-1 text-xs font-semibold text-cyan-300 sm:mt-2 sm:text-sm">
-                    당신의 턴입니다!
-                  </div>
-                  <div className="mt-1 text-[10px] text-slate-400 sm:text-xs">
-                    카드를 사용하거나 턴을 종료하세요
+                  <div className="text-base sm:text-2xl">⚔️</div>
+                  <div className="mt-0.5 text-[9px] font-semibold text-cyan-300 sm:mt-2 sm:text-sm">
+                    내 턴
                   </div>
                 </motion.div>
               ) : (
                 <div className="text-center">
-                  <div className="text-xl text-slate-600 sm:text-2xl">⏳</div>
-                  <div className="mt-1 text-xs text-slate-400 sm:mt-2 sm:text-sm">
-                    상대의 턴을 기다리는 중...
+                  <div className="text-base text-slate-600 sm:text-2xl">⏳</div>
+                  <div className="mt-0.5 text-[9px] text-slate-400 sm:mt-2 sm:text-sm">
+                    대기 중...
                   </div>
                 </div>
               )}
             </div>
           </div>
-          <GameLog entries={gameState.log} />
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <GameLog entries={gameState.log} />
+          </div>
         </div>
 
         {/* 우측: 에너지 + 행동 */}
-        <div className="flex w-full flex-row gap-2 sm:gap-3 md:w-52 md:flex-col">
-          <div className="h-32 w-20 sm:h-40 sm:w-24 md:h-auto md:w-full">
+        <div className="flex w-full flex-row gap-1 flex-shrink-0 sm:gap-3 md:w-52 md:flex-col">
+          <div className="h-24 w-16 sm:h-40 sm:w-24 md:h-auto md:w-full">
             <EnergyBar current={gameState.currentEnergy} max={gameState.maxEnergy} />
           </div>
-          <div className="flex flex-1 flex-col gap-1.5 rounded-xl border border-slate-700/80 bg-slate-900/90 p-2 text-[10px] sm:gap-2 sm:rounded-2xl sm:p-3 sm:text-[11px]">
+          <div className="flex flex-1 flex-col gap-1 rounded-lg border border-slate-700/80 bg-slate-900/90 p-1.5 text-[9px] sm:gap-2 sm:rounded-2xl sm:p-3 sm:text-[11px]">
             <button
               type="button"
               onClick={onEndTurn}
               disabled={!isMyTurn || gameState.isGameOver}
-              className="w-full rounded-md bg-amber-500 px-2 py-1.5 text-[10px] font-semibold text-slate-950 shadow hover:bg-amber-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300 sm:px-3 sm:py-2 sm:text-xs touch-manipulation"
+              className="w-full rounded-md bg-amber-500 px-2 py-1.5 text-[9px] font-semibold text-slate-950 shadow hover:bg-amber-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300 sm:px-3 sm:py-2 sm:text-xs touch-manipulation"
             >
-              {isMyTurn ? '턴 종료' : '상대 턴 대기 중'}
+              {isMyTurn ? '턴 종료' : '대기'}
             </button>
             <button
               type="button"
               onClick={onBack}
-              className="w-full rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-[10px] font-semibold text-slate-100 hover:bg-slate-800 sm:px-3 sm:py-1.5 sm:text-[11px] touch-manipulation"
+              className="w-full rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-[9px] font-semibold text-slate-100 hover:bg-slate-800 sm:px-3 sm:py-1.5 sm:text-[11px] touch-manipulation"
             >
               나가기
             </button>
-            <div className="mt-1 hidden text-[8px] text-slate-500 sm:mt-2 sm:block sm:text-[9px]">
-              PvP 모드에서는 보스 AI가 없습니다. 상대 플레이어와만 대결합니다.
-            </div>
           </div>
         </div>
       </section>
 
       {/* 하단: 나 + 손패 */}
-      <section className="rounded-xl bg-gradient-to-t from-slate-950 via-slate-900 to-slate-900/80 p-2 sm:rounded-2xl sm:p-3">
-        <div className="mb-2 flex items-center justify-between gap-2 sm:gap-3">
-          <div className="w-48 max-w-full sm:w-64">
+      <section className="rounded-lg bg-gradient-to-t from-slate-950 via-slate-900 to-slate-900/80 p-1 flex-shrink-0 sm:rounded-2xl sm:p-3">
+        <div className="mb-1 flex items-center justify-between gap-1.5 sm:mb-2 sm:gap-3">
+          <div className="w-40 max-w-full sm:w-64">
             <HeroPanel
               name={currentUser.name}
               hp={gameState.playerHp}
@@ -348,9 +339,6 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
               statusEffects={gameState.playerStatusEffects}
               description="당신"
             />
-          </div>
-          <div className="hidden text-right text-[10px] text-slate-300 sm:block">
-            {isMyTurn ? '카드를 사용하세요' : '상대의 턴입니다'}
           </div>
         </div>
         <HandArea
@@ -380,8 +368,8 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
                 : '더 강해져서 돌아오세요'}
             </p>
             
-            {/* 디버그 정보 */}
-            <div className="mb-3 rounded bg-slate-800/50 p-2 text-xs text-left text-slate-400">
+            {/* 디버그 정보 - 모바일에서 숨김 */}
+            <div className="hidden mb-3 rounded bg-slate-800/50 p-2 text-xs text-left text-slate-400 sm:block">
               <div>승자: {gameState.winner}</div>
               <div>히든카드 보유: {hasHiddenCard ? 'YES' : 'NO'}</div>
               <div>버튼 표시 조건: {gameState.winner === 'BOSS' && !hasHiddenCard ? 'TRUE' : 'FALSE'}</div>
