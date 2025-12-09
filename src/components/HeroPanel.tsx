@@ -37,7 +37,7 @@ export const HeroPanel: React.FC<HeroPanelProps> = ({
 
   return (
     <motion.div
-      className={`flex flex-col rounded-2xl border px-4 py-3 shadow-md ${
+      className={`flex flex-col rounded-xl border px-2 py-2 shadow-md sm:rounded-2xl sm:px-4 sm:py-3 ${
         isBoss
           ? 'border-rose-500/60 bg-gradient-to-b from-rose-900/70 to-slate-900/80'
           : 'border-cyan-500/60 bg-gradient-to-b from-slate-800 to-slate-900'
@@ -46,11 +46,11 @@ export const HeroPanel: React.FC<HeroPanelProps> = ({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
           {/* 캐릭터 아이콘 */}
           <motion.div
-            className={`flex h-10 w-10 items-center justify-center rounded-full text-lg font-bold ${
+            className={`flex h-8 w-8 items-center justify-center rounded-full text-base font-bold flex-shrink-0 sm:h-10 sm:w-10 sm:text-lg ${
               isBoss ? 'bg-rose-400 text-rose-950' : 'bg-cyan-400 text-cyan-950'
             }`}
             animate={isLowHp ? { scale: [1, 1.1, 1] } : {}}
@@ -59,20 +59,20 @@ export const HeroPanel: React.FC<HeroPanelProps> = ({
             {isBoss ? '👹' : '🧑'}
           </motion.div>
 
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold text-slate-50">{name}</span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs font-semibold text-slate-50 truncate sm:text-sm">{name}</span>
             {description && (
-              <span className="text-[10px] text-slate-200/80">{description}</span>
+              <span className="text-[9px] text-slate-200/80 sm:text-[10px]">{description}</span>
             )}
           </div>
         </div>
 
         {/* HP 표시 */}
-        <div className="flex flex-col items-end gap-1">
-          <div className="flex items-center gap-1 text-sm font-semibold text-slate-50">
-            <span>HP</span>
+        <div className="flex flex-col items-end gap-0.5 sm:gap-1 flex-shrink-0">
+          <div className="flex items-center gap-1 text-xs font-semibold text-slate-50 sm:text-sm">
+            <span className="hidden sm:inline">HP</span>
             <motion.span
-              className={`rounded-full px-2 py-0.5 text-xs ${
+              className={`rounded-full px-1.5 py-0.5 text-[10px] sm:px-2 sm:text-xs ${
                 isBoss ? 'bg-rose-500/80' : 'bg-cyan-500/80'
               } text-slate-950`}
               animate={isLowHp ? { backgroundColor: ['#ef4444', '#dc2626', '#ef4444'] } : {}}
@@ -85,13 +85,13 @@ export const HeroPanel: React.FC<HeroPanelProps> = ({
           {/* 실드 표시 */}
           {shield > 0 && (
             <motion.div
-              className="flex items-center gap-1 text-xs font-semibold text-sky-300"
+              className="flex items-center gap-1 text-[10px] font-semibold text-sky-300 sm:text-xs"
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0 }}
             >
               <span>🛡️</span>
-              <span className="rounded bg-sky-500/30 px-1.5 py-0.5">{shield}</span>
+              <span className="rounded bg-sky-500/30 px-1 py-0.5 sm:px-1.5">{shield}</span>
             </motion.div>
           )}
         </div>

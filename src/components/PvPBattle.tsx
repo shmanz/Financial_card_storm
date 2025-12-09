@@ -10,7 +10,7 @@
  * 4. 실시간 상태 동기화
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Socket } from 'socket.io-client';
 import { useAuth } from '../contexts/AuthContext';
 import { HeroPanel } from './HeroPanel';
@@ -82,7 +82,8 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
       // 핵심: data.bossHp = 내 실제 HP!
       // ========================================
       // 상대가 나를 공격 → 상대의 bossHp 감소 → 그게 내 playerHp
-      if (data.bossHp !== undefined) {
+      // 무한 루프 방지: 현재 HP와 다를 때만 업데이트
+      if (data.bossHp !== undefined && data.bossHp !== gameState.playerHp) {
         const newMyHp = data.bossHp;
         const newMyShield = data.bossShield || 0;
         
@@ -95,21 +96,23 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
         console.log('========================================');
         
         onUpdateMyHp(newMyHp, newMyShield);
+      } else if (data.bossHp !== undefined) {
+        console.log('[PvP] ⏭️ HP 변경 없음, 업데이트 스킵 (무한 루프 방지)');
       }
       
       // 상대의 실제 HP/실드 (상대의 playerHp)
-      if (data.hp !== undefined) {
+      if (data.hp !== undefined && data.hp !== opponentHp) {
         console.log('[PvP] 상대 HP 설정:', data.hp, '(화면 상단 보스 HP로 표시됨)');
         setOpponentHp(data.hp);
         onUpdateOpponentHp(data.hp, data.shield || 0);
       }
-      if (data.shield !== undefined) {
+      if (data.shield !== undefined && data.shield !== opponentShield) {
         setOpponentShield(data.shield);
       }
       if (data.statusEffects) {
         setOpponentStatusEffects(data.statusEffects);
       }
-      if (data.energy !== undefined) {
+      if (data.energy !== undefined && data.energy !== opponentEnergy) {
         setOpponentEnergy(data.energy);
       }
     });
@@ -190,35 +193,62 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
       socket.off('game:roundComplete');
       socket.off('game:playerLeft');
     };
-  }, [socket, onTurnReceived]);
+  }, [socket, onTurnReceived, gameState.playerHp, opponentHp, opponentShield, opponentEnergy]);
 
   // ========================================
-  // 내 상태를 상대에게 실시간 전송
+  // 내 상태를 상대에게 실시간 전송 (무한 루프 방지)
   // ========================================
+  // 주의: game:stateSync 수신으로 인한 HP 변경은 emit하지 않음
+  // 카드 사용, 턴 종료 등 실제 액션 시에만 전송
+  
+  const lastSyncRef = useRef<{ hp: number; shield: number; energy: number } | null>(null);
   
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !isMyTurn) return; // 내 턴일 때만 전송
     
-    socket.emit('game:syncState', {
+    const currentState = {
+      hp: gameState.playerHp,
+      shield: gameState.playerShield,
+      energy: gameState.currentEnergy
+    };
+    
+    // 이전 상태와 비교하여 실제 변경이 있을 때만 전송
+    const lastState = lastSyncRef.current;
+    if (lastState && 
+        lastState.hp === currentState.hp &&
+        lastState.shield === currentState.shield &&
+        lastState.energy === currentState.energy) {
+      return; // 변경 없음, 전송 안 함
+    }
+    
+    // 상태 저장
+    lastSyncRef.current = currentState;
+    
+    // 상대에게 전송 (bossHp는 내가 본 상대 HP)
+    socket.emit('game:stateSync', {
       hp: gameState.playerHp,
       shield: gameState.playerShield,
       statusEffects: gameState.playerStatusEffects,
-      energy: gameState.currentEnergy
+      energy: gameState.currentEnergy,
+      bossHp: gameState.bossHp, // 내가 본 상대 HP
+      bossShield: gameState.bossShield
     });
-  }, [socket, gameState.playerHp, gameState.playerShield, gameState.currentEnergy]);
+    
+    console.log('[PvP] 내 상태 전송:', currentState);
+  }, [socket, isMyTurn, gameState.playerHp, gameState.playerShield, gameState.currentEnergy, gameState.bossHp, gameState.bossShield]);
 
   if (!currentUser) return null;
 
   return (
-    <div className="flex min-h-screen flex-col gap-3 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4">
-      {/* 디버그 정보 */}
-      <div className="rounded border border-purple-500/50 bg-purple-900/20 p-2 text-xs text-purple-200">
+    <div className="flex min-h-screen flex-col gap-2 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-2 sm:gap-3 sm:p-4">
+      {/* 디버그 정보 - 모바일에서 숨김 */}
+      <div className="hidden rounded border border-purple-500/50 bg-purple-900/20 p-2 text-xs text-purple-200 sm:block">
         <strong>PvP 디버그:</strong> 내 턴 = {isMyTurn ? 'YES' : 'NO'} | 턴 #{gameState.turn} | 모드 = {gameState.gameMode} | 피로도 = {gameState.fatigue}
       </div>
 
       {/* 상단: 상대 플레이어 (기존 보스 위치) */}
-      <section className="flex items-start justify-between gap-3">
-        <div className="flex-1">
+      <section className="flex items-start justify-between gap-2 sm:gap-3">
+        <div className="flex-1 min-w-0">
           <HeroPanel
             isBoss
             name={opponentName}
@@ -229,27 +259,27 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
             description="상대 플레이어"
           />
         </div>
-        <div className="text-right text-[11px] text-slate-300">
+        <div className="text-right text-[10px] text-slate-300 sm:text-[11px] flex-shrink-0">
           <div>턴 {gameState.turn}</div>
-          <div className={`font-semibold ${isMyTurn ? 'text-cyan-300' : 'text-rose-300'}`}>
+          <div className={`font-semibold text-xs sm:text-sm ${isMyTurn ? 'text-cyan-300' : 'text-rose-300'}`}>
             {isMyTurn ? '⚔️ 내 턴!' : '⏳ 상대 턴'}
           </div>
-          <div className="mt-1 text-[10px]">상대 에너지: {opponentEnergy}</div>
-          <div className="mt-1 text-[10px]">덱: {gameState.deck.length}장</div>
+          <div className="mt-1 text-[9px] sm:text-[10px]">에너지: {opponentEnergy}</div>
+          <div className="mt-1 text-[9px] sm:text-[10px]">덱: {gameState.deck.length}</div>
           {gameState.fatigue > 0 && (
-            <div className="mt-1 text-red-400 font-semibold text-[10px]">
-              ⚠️ 피로도: {gameState.fatigue}
+            <div className="mt-1 text-red-400 font-semibold text-[9px] sm:text-[10px]">
+              ⚠️ {gameState.fatigue}
             </div>
           )}
         </div>
       </section>
 
       {/* 중앙: 전장 + 사이드바 */}
-      <section className="flex flex-1 flex-col gap-3 md:flex-row">
+      <section className="flex flex-1 flex-col gap-2 sm:gap-3 md:flex-row">
         {/* 전장 + 로그 */}
-        <div className="flex-1 space-y-3">
-          <div className="rounded-2xl border border-slate-700/80 bg-gradient-to-b from-slate-800/80 via-slate-900/90 to-slate-950 p-3">
-            <div className="flex h-32 items-center justify-center rounded-xl border border-dashed border-slate-700 bg-slate-900/70">
+        <div className="flex-1 space-y-2 sm:space-y-3">
+          <div className="rounded-xl border border-slate-700/80 bg-gradient-to-b from-slate-800/80 via-slate-900/90 to-slate-950 p-2 sm:rounded-2xl sm:p-3">
+            <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-900/70 sm:h-32 sm:rounded-xl">
               {isMyTurn ? (
                 <motion.div
                   className="text-center"
@@ -257,18 +287,18 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
                   animate={{ scale: 1 }}
                   transition={{ repeat: Infinity, duration: 1, repeatType: 'reverse' }}
                 >
-                  <div className="text-2xl">⚔️</div>
-                  <div className="mt-2 text-sm font-semibold text-cyan-300">
+                  <div className="text-xl sm:text-2xl">⚔️</div>
+                  <div className="mt-1 text-xs font-semibold text-cyan-300 sm:mt-2 sm:text-sm">
                     당신의 턴입니다!
                   </div>
-                  <div className="mt-1 text-xs text-slate-400">
+                  <div className="mt-1 text-[10px] text-slate-400 sm:text-xs">
                     카드를 사용하거나 턴을 종료하세요
                   </div>
                 </motion.div>
               ) : (
                 <div className="text-center">
-                  <div className="text-2xl text-slate-600">⏳</div>
-                  <div className="mt-2 text-sm text-slate-400">
+                  <div className="text-xl text-slate-600 sm:text-2xl">⏳</div>
+                  <div className="mt-1 text-xs text-slate-400 sm:mt-2 sm:text-sm">
                     상대의 턴을 기다리는 중...
                   </div>
                 </div>
@@ -279,27 +309,27 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
         </div>
 
         {/* 우측: 에너지 + 행동 */}
-        <div className="flex w-full flex-row gap-3 md:w-52 md:flex-col">
-          <div className="h-40 w-24 md:h-auto md:w-full">
+        <div className="flex w-full flex-row gap-2 sm:gap-3 md:w-52 md:flex-col">
+          <div className="h-32 w-20 sm:h-40 sm:w-24 md:h-auto md:w-full">
             <EnergyBar current={gameState.currentEnergy} max={gameState.maxEnergy} />
           </div>
-          <div className="flex flex-1 flex-col gap-2 rounded-2xl border border-slate-700/80 bg-slate-900/90 p-3 text-[11px]">
+          <div className="flex flex-1 flex-col gap-1.5 rounded-xl border border-slate-700/80 bg-slate-900/90 p-2 text-[10px] sm:gap-2 sm:rounded-2xl sm:p-3 sm:text-[11px]">
             <button
               type="button"
               onClick={onEndTurn}
               disabled={!isMyTurn || gameState.isGameOver}
-              className="w-full rounded-md bg-amber-500 px-3 py-2 text-xs font-semibold text-slate-950 shadow hover:bg-amber-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
+              className="w-full rounded-md bg-amber-500 px-2 py-1.5 text-[10px] font-semibold text-slate-950 shadow hover:bg-amber-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300 sm:px-3 sm:py-2 sm:text-xs touch-manipulation"
             >
               {isMyTurn ? '턴 종료' : '상대 턴 대기 중'}
             </button>
             <button
               type="button"
               onClick={onBack}
-              className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-slate-100 hover:bg-slate-800"
+              className="w-full rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-[10px] font-semibold text-slate-100 hover:bg-slate-800 sm:px-3 sm:py-1.5 sm:text-[11px] touch-manipulation"
             >
               나가기
             </button>
-            <div className="mt-2 text-[9px] text-slate-500">
+            <div className="mt-1 hidden text-[8px] text-slate-500 sm:mt-2 sm:block sm:text-[9px]">
               PvP 모드에서는 보스 AI가 없습니다. 상대 플레이어와만 대결합니다.
             </div>
           </div>
@@ -307,9 +337,9 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
       </section>
 
       {/* 하단: 나 + 손패 */}
-      <section className="rounded-2xl bg-gradient-to-t from-slate-950 via-slate-900 to-slate-900/80 p-3">
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <div className="w-64 max-w-full">
+      <section className="rounded-xl bg-gradient-to-t from-slate-950 via-slate-900 to-slate-900/80 p-2 sm:rounded-2xl sm:p-3">
+        <div className="mb-2 flex items-center justify-between gap-2 sm:gap-3">
+          <div className="w-48 max-w-full sm:w-64">
             <HeroPanel
               name={currentUser.name}
               hp={gameState.playerHp}
@@ -319,7 +349,7 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
               description="당신"
             />
           </div>
-          <div className="text-right text-[10px] text-slate-300">
+          <div className="hidden text-right text-[10px] text-slate-300 sm:block">
             {isMyTurn ? '카드를 사용하세요' : '상대의 턴입니다'}
           </div>
         </div>

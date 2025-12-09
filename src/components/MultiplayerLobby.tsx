@@ -25,21 +25,25 @@ interface Room {
 
 interface MultiplayerLobbyProps {
   socket: Socket;
+  currentUserName: string; // 로그인한 사용자 이름
   onStartGame: (roomId: string, isFirstPlayer: boolean, opponentNickname: string) => void;
   onBack: () => void;
 }
 
 export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
   socket,
+  currentUserName,
   onStartGame,
   onBack
 }) => {
-  const [nickname, setNickname] = useState('');
   const [roomName, setRoomName] = useState('');
   const [rooms, setRooms] = useState<Room[]>([]);
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
   const [error, setError] = useState('');
   const [isConnected, setIsConnected] = useState(false);
+  
+  // 로그인한 사용자 이름을 닉네임으로 사용
+  const nickname = currentUserName || 'Guest';
 
   useEffect(() => {
     if (!socket) return;
@@ -127,21 +131,23 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
   }, [socket, onStartGame]);
 
   const handleCreateRoom = () => {
-    if (!socket || !nickname.trim() || !roomName.trim()) {
-      setError('닉네임과 방 이름을 입력하세요.');
+    if (!socket || !roomName.trim()) {
+      setError('방 이름을 입력하세요.');
       return;
     }
 
-    socket.emit('room:create', { nickname: nickname.trim(), roomName: roomName.trim() });
+    // 로그인한 사용자 이름을 자동으로 사용
+    socket.emit('room:create', { nickname: nickname, roomName: roomName.trim() });
   };
 
   const handleJoinRoom = (roomId: string) => {
-    if (!socket || !nickname.trim()) {
-      setError('닉네임을 입력하세요.');
+    if (!socket) {
+      setError('서버에 연결되지 않았습니다.');
       return;
     }
 
-    socket.emit('room:join', { roomId, nickname: nickname.trim() });
+    // 로그인한 사용자 이름을 자동으로 사용
+    socket.emit('room:join', { roomId, nickname: nickname });
   };
 
   const handleReady = () => {
@@ -330,14 +336,10 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
         {/* 방 생성 */}
         <div className="rounded-2xl border border-cyan-500/60 bg-slate-900/90 p-6">
           <h2 className="mb-4 text-lg font-semibold text-cyan-100">새 방 만들기</h2>
+          <div className="mb-3 rounded-lg border border-cyan-500/30 bg-cyan-900/20 px-3 py-2 text-sm text-cyan-200">
+            <span className="font-semibold">플레이어:</span> {nickname}
+          </div>
           <div className="flex gap-3">
-            <input
-              type="text"
-              placeholder="닉네임"
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
-              className="flex-1 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-400 focus:border-cyan-500 focus:outline-none"
-            />
             <input
               type="text"
               placeholder="방 이름"
@@ -347,7 +349,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
             />
             <button
               onClick={handleCreateRoom}
-              disabled={!isConnected}
+              disabled={!isConnected || !roomName.trim()}
               className="rounded-lg bg-cyan-500 px-6 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-slate-600"
             >
               방 생성

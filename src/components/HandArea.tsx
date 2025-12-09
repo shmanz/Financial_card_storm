@@ -11,7 +11,7 @@ interface HandAreaProps {
 
 export const HandArea: React.FC<HandAreaProps> = ({ hand, currentEnergy, onPlayCard }) => {
   return (
-    <div className="flex w-full items-end justify-center gap-3 overflow-x-auto px-4 py-3">
+    <div className="flex w-full items-end justify-center gap-2 overflow-x-auto px-2 py-3 sm:gap-3 sm:px-4 touch-pan-x">
       {hand.length === 0 && (
         <motion.div
           className="rounded-xl border border-dashed border-slate-600 px-4 py-2 text-xs text-slate-400"
@@ -25,7 +25,7 @@ export const HandArea: React.FC<HandAreaProps> = ({ hand, currentEnergy, onPlayC
         {hand.map((card, index) => (
           <motion.div
             key={card.id}
-            className="min-w-[140px] max-w-[140px]"
+            className="min-w-[110px] max-w-[110px] sm:min-w-[140px] sm:max-w-[140px] flex-shrink-0"
             initial={{ opacity: 0, y: 50, rotateY: -90 }}
             animate={{ opacity: 1, y: 0, rotateY: 0 }}
             exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}

@@ -274,25 +274,9 @@ const App: React.FC = () => {
   // Socket.IO 연결 (멀티플레이 모드용)
   const { socket, connected } = useSocket();
 
-  // PvP 모드에서 state 변경 감지해서 자동 동기화 (Hook 순서 유지를 위해 조건부 return 전에 배치)
-  React.useEffect(() => {
-    if (screen === 'MULTIPLAYER_BATTLE' && socket && state && isAuthenticated) {
-      console.log('========================================');
-      console.log('[PvP Auto Sync] 🚀 상태 자동 전송!');
-      console.log('[PvP Auto Sync] 내 HP:', state.playerHp, '내 실드:', state.playerShield);
-      console.log('[PvP Auto Sync] 상대 HP (내가 본):', state.bossHp, '상대 실드:', state.bossShield);
-      console.log('========================================');
-      
-      socket.emit('game:stateSync', {
-        hp: state.playerHp,
-        shield: state.playerShield,
-        statusEffects: state.playerStatusEffects,
-        energy: state.currentEnergy,
-        bossHp: state.bossHp, // 내가 공격한 후 줄어든 상대 HP
-        bossShield: state.bossShield
-      });
-    }
-  }, [state?.playerHp, state?.bossHp, state?.playerShield, state?.bossShield, screen, socket, isAuthenticated]);
+  // PvP 모드에서 state 변경 감지해서 자동 동기화 (무한 루프 방지)
+  // 주의: PvPBattle.tsx에서 더 세밀한 제어를 하므로 여기서는 제거
+  // 카드 사용, 턴 종료 등은 PvPBattle에서 명시적으로 처리
 
   // 로그인하지 않았으면 로그인 화면 표시
   if (!isAuthenticated || !currentUser) {
@@ -323,8 +307,10 @@ const App: React.FC = () => {
     }
 
     // 로컬에서 카드 사용 (리듀서 호출)
-    // 리듀서가 bossHp를 줄이면 useEffect가 자동으로 Socket 전송
     dispatch({ type: 'PLAY_CARD', payload: { cardId } });
+    
+    // PvP 모드에서 카드 사용 후 상태 전송은 PvPBattle 컴포넌트의 useEffect에서 처리
+    // (무한 루프 방지를 위해 명시적 전송은 하지 않음)
   };
 
   const handleEndTurn = () => {
@@ -433,21 +419,21 @@ const App: React.FC = () => {
               </div>
               
               {/* 게임 시작 버튼 */}
-              <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <div className="mt-4 flex flex-col gap-2 sm:mt-6 sm:flex-row sm:justify-center sm:gap-3">
                 <button
                   type="button"
                   onClick={handleStartGame}
-                  className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-sky-500 px-8 py-4 text-base font-bold text-slate-950 shadow-lg hover:from-cyan-400 hover:to-sky-400"
+                  className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-sky-500 px-6 py-3 text-sm font-bold text-slate-950 shadow-lg hover:from-cyan-400 hover:to-sky-400 sm:px-8 sm:py-4 sm:text-base touch-manipulation"
                 >
-                  <span className="text-2xl">⚔️</span>
+                  <span className="text-xl sm:text-2xl">⚔️</span>
                   <span>싱글 플레이 시작</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleMultiplayerClick}
-                  className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 px-8 py-4 text-base font-bold text-slate-950 shadow-lg hover:from-purple-400 hover:to-pink-400"
+                  className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-3 text-sm font-bold text-slate-950 shadow-lg hover:from-purple-400 hover:to-pink-400 sm:px-8 sm:py-4 sm:text-base touch-manipulation"
                 >
-                  <span className="text-2xl">🎮</span>
+                  <span className="text-xl sm:text-2xl">🎮</span>
                   <span>멀티플레이 (PvP)</span>
                   {isGuest && <span className="text-xs">(로그인 필요)</span>}
                 </button>
@@ -455,7 +441,7 @@ const App: React.FC = () => {
             </div>
 
             {/* 로비 메뉴 그리드 */}
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
               {/* 계좌 현황 카드 */}
               <button
                 onClick={() => setScreen('ACCOUNT')}
@@ -641,6 +627,7 @@ const App: React.FC = () => {
         {screen === 'MULTIPLAYER_LOBBY' && socket && (
           <MultiplayerLobby
             socket={socket}
+            currentUserName={currentUser.name}
             onStartGame={(roomId, isFirstPlayer, opponentName) => {
               console.log('멀티플레이 게임 시작:', roomId, '선공:', isFirstPlayer, '상대:', opponentName);
               setCurrentRoomId(roomId);

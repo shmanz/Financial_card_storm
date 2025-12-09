@@ -71,7 +71,7 @@ export const CardView: React.FC<CardViewProps> = ({ card, disabled, onPlay }) =>
     >
       {/* 비용 배지 */}
       <motion.div
-        className="absolute -left-2 -top-2 flex h-10 w-10 items-center justify-center rounded-full bg-cyan-500 text-xl font-extrabold text-slate-950 shadow-lg ring-2 ring-cyan-300"
+        className="absolute -left-1 -top-1 flex h-8 w-8 items-center justify-center rounded-full bg-cyan-500 text-base font-extrabold text-slate-950 shadow-lg ring-2 ring-cyan-300 sm:-left-2 sm:-top-2 sm:h-10 sm:w-10 sm:text-xl"
         whileHover={{ rotate: 360 }}
         transition={{ duration: 0.5 }}
       >
@@ -86,16 +86,16 @@ export const CardView: React.FC<CardViewProps> = ({ card, disabled, onPlay }) =>
       )}
 
       {/* 카드 이름 */}
-      <div className="mt-2 text-center text-sm font-bold text-cyan-100">{card.name}</div>
+      <div className="mt-2 text-center text-xs font-bold text-cyan-100 sm:text-sm line-clamp-2">{card.name}</div>
 
       {/* 카테고리 필 */}
-      <div className="mt-1 self-center rounded-full bg-slate-700/80 px-2 py-0.5 text-[9px] uppercase tracking-wide text-cyan-300 shadow-inner">
+      <div className="mt-1 self-center rounded-full bg-slate-700/80 px-1.5 py-0.5 text-[8px] uppercase tracking-wide text-cyan-300 shadow-inner sm:px-2 sm:text-[9px]">
         {card.category}
       </div>
 
       {/* 카드 일러스트 (카테고리 이모지) */}
       <div className="relative my-2 overflow-hidden rounded-lg border border-slate-600/50 bg-gradient-to-br from-slate-700 to-slate-900">
-        <div className="flex h-24 items-center justify-center text-5xl">
+        <div className="flex h-16 items-center justify-center text-3xl sm:h-24 sm:text-5xl">
           {card.imageUrl || '💳'}
         </div>
       </div>
@@ -113,20 +113,20 @@ export const CardView: React.FC<CardViewProps> = ({ card, disabled, onPlay }) =>
       </div>
 
       {/* 설명 */}
-      <div className="flex-1 rounded-md bg-slate-900/70 p-2 text-[10px] leading-snug text-slate-200 shadow-inner">
+      <div className="flex-1 rounded-md bg-slate-900/70 p-1.5 text-[9px] leading-snug text-slate-200 shadow-inner line-clamp-2 sm:p-2 sm:text-[10px]">
         {card.description}
       </div>
 
       {/* 공격력 / 방어력 푸터 */}
-      <div className="mt-2 flex items-center justify-between text-xs font-semibold">
+      <div className="mt-2 flex items-center justify-between text-[10px] font-semibold sm:text-xs">
         <span className="flex items-center gap-1 text-amber-300">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/30 text-[10px]">
+          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-amber-500/30 text-[8px] sm:h-5 sm:w-5 sm:text-[10px]">
             ⚔️
           </span>
           {card.attack}
         </span>
         <span className="flex items-center gap-1 text-sky-300">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sky-500/30 text-[10px]">
+          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-sky-500/30 text-[8px] sm:h-5 sm:w-5 sm:text-[10px]">
             🛡️
           </span>
           {card.defense}

@@ -1,0 +1,46 @@
+/* ========================================
+ * 모바일 최적화 스타일
+ * ========================================
+ */
+
+/* 터치 이벤트 최적화 */
+* {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* 모바일에서 스크롤 부드럽게 */
+html {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* 모바일에서 텍스트 선택 방지 (게임 UI) */
+button, .card-view {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* 모바일에서 카드 호버 효과 제거 (터치 디바이스) */
+@media (hover: none) and (pointer: coarse) {
+  .card-view:hover {
+    transform: none !important;
+  }
+}
+
+/* 모바일에서 작은 화면 대응 */
+@media (max-width: 640px) {
+  /* 스크롤바 숨기기 (모바일) */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  
+  /* 터치 영역 최소 크기 (44x44px 권장) */
+  button, a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
