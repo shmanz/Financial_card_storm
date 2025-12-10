@@ -22,6 +22,7 @@ interface AuthContextType {
   updateProductBalance: (type: string, name: string, balanceIncrease: number) => void;
   addPurchasedProduct: (productId: string, card: any) => void;
   unlockHiddenCard: () => void;
+  updatePvPStats: (won: boolean) => void; // PvP 승/패 업데이트
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -63,14 +64,23 @@ const createGuestUser = (): UserProfile => {
         cardLimit: 2000000
       }
     ],
-    transactions: guestTransactions
+    transactions: guestTransactions,
+    pvpStats: {
+      wins: 0,
+      losses: 0,
+      totalGames: 0,
+      winRate: 0,
+      weeklyRecords: [],
+      lastUpdated: new Date()
+    },
+    hallOfFameRewards: []
   };
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
-  // LocalStorage에서 세션 복원
+  // LocalStorage에서 세션 복원 및 통계 로드
   useEffect(() => {
     const savedUserId = localStorage.getItem('currentUserId');
     if (savedUserId) {
@@ -79,6 +89,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         const user = MOCK_USERS.find(u => u.id === savedUserId);
         if (user) {
+          // localStorage에서 저장된 통계 로드
+          const storageKey = `pvpStats_${user.id}`;
+          const savedStats = localStorage.getItem(storageKey);
+          if (savedStats) {
+            try {
+              const stats = JSON.parse(savedStats);
+              user.pvpStats = {
+                wins: stats.wins || 0,
+                losses: stats.losses || 0,
+                totalGames: stats.totalGames || 0,
+                winRate: stats.winRate || 0,
+                weeklyRecords: stats.weeklyRecords || [],
+                lastUpdated: stats.lastUpdated ? new Date(stats.lastUpdated) : new Date()
+              };
+            } catch (e) {
+              console.error('[PvP 통계] 로드 실패:', e);
+            }
+          }
           setCurrentUser(user);
         }
       }
@@ -143,7 +171,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       purchasedShopProducts: [],
       purchasedCards: [],
       bankProducts: products,
-      transactions: dummyTransactions // 최소 거래 내역
+      transactions: dummyTransactions, // 최소 거래 내역
+      pvpStats: {
+        wins: 0,
+        losses: 0,
+        totalGames: 0,
+        winRate: 0,
+        weeklyRecords: [],
+        lastUpdated: new Date()
+      },
+      hallOfFameRewards: []
     };
 
     MOCK_USERS.push(newUser);
@@ -254,6 +291,120 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('[히든 카드] ✅ 상태 업데이트 완료');
   };
 
+  // 주 단위 계산 유틸리티
+  const getWeekNumber = (date: Date): string => {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    return `${d.getUTCFullYear()}-W${weekNo.toString().padStart(2, '0')}`;
+  };
+
+  const updatePvPStats = (won: boolean) => {
+    if (!currentUser) return;
+
+    console.log('[PvP 통계] 업데이트 시작:', currentUser.name, won ? '승리' : '패배');
+
+    // MOCK_USERS에서 해당 사용자 찾기 (데이터 영구 저장)
+    const userInDb = MOCK_USERS.find(u => u.id === currentUser.id);
+    if (!userInDb) {
+      console.error('[PvP 통계] MOCK_USERS에서 사용자를 찾을 수 없음:', currentUser.id);
+      return;
+    }
+
+    // localStorage에서 저장된 통계 가져오기 (영구 저장)
+    const storageKey = `pvpStats_${currentUser.id}`;
+    let stats = JSON.parse(localStorage.getItem(storageKey) || 'null');
+    
+    // 통계 초기화 (없으면)
+    if (!stats) {
+      stats = {
+        wins: 0,
+        losses: 0,
+        totalGames: 0,
+        winRate: 0,
+        weeklyRecords: [],
+        lastUpdated: new Date().toISOString()
+      };
+    }
+
+    const now = new Date();
+    const currentWeek = getWeekNumber(now);
+
+    // 전체 통계 업데이트
+    const beforeWins = stats.wins;
+    const beforeLosses = stats.losses;
+    
+    if (won) {
+      stats.wins += 1;
+    } else {
+      stats.losses += 1;
+    }
+    stats.totalGames = stats.wins + stats.losses;
+    stats.winRate = stats.totalGames > 0 ? stats.wins / stats.totalGames : 0;
+    stats.lastUpdated = now.toISOString();
+
+    console.log('[PvP 통계] 전체 통계:', `${beforeWins}승 ${beforeLosses}패 → ${stats.wins}승 ${stats.losses}패`);
+
+    // 주 단위 기록 업데이트
+    if (!stats.weeklyRecords) {
+      stats.weeklyRecords = [];
+    }
+
+    let weekRecord = stats.weeklyRecords.find((r: any) => r.week === currentWeek);
+    if (!weekRecord) {
+      weekRecord = {
+        week: currentWeek,
+        wins: 0,
+        losses: 0,
+        winRate: 0
+      };
+      stats.weeklyRecords.push(weekRecord);
+    }
+
+    // 주 단위 통계 업데이트
+    const beforeWeekWins = weekRecord.wins;
+    const beforeWeekLosses = weekRecord.losses;
+    
+    if (won) {
+      weekRecord.wins += 1;
+    } else {
+      weekRecord.losses += 1;
+    }
+    const weekTotal = weekRecord.wins + weekRecord.losses;
+    weekRecord.winRate = weekTotal > 0 ? weekRecord.wins / weekTotal : 0;
+
+    console.log('[PvP 통계] 주간 통계:', `${beforeWeekWins}승 ${beforeWeekLosses}패 → ${weekRecord.wins}승 ${weekRecord.losses}패`);
+
+    // 오래된 주차 기록 정리 (최근 4주만 유지)
+    stats.weeklyRecords = stats.weeklyRecords
+      .sort((a: any, b: any) => b.week.localeCompare(a.week))
+      .slice(0, 4);
+
+    // localStorage에 영구 저장
+    localStorage.setItem(storageKey, JSON.stringify(stats));
+
+    // MOCK_USERS와 currentUser도 동기화
+    userInDb.pvpStats = {
+      wins: stats.wins,
+      losses: stats.losses,
+      totalGames: stats.totalGames,
+      winRate: stats.winRate,
+      weeklyRecords: stats.weeklyRecords,
+      lastUpdated: new Date(stats.lastUpdated)
+    };
+
+    currentUser.pvpStats = { ...userInDb.pvpStats };
+
+    console.log('[PvP 통계] 업데이트 완료:', {
+      전체: `${stats.wins}승 ${stats.losses}패 (${(stats.winRate * 100).toFixed(1)}%)`,
+      이번주: `${weekRecord.wins}승 ${weekRecord.losses}패 (${(weekRecord.winRate * 100).toFixed(1)}%)`
+    });
+
+    setCurrentUser({ ...currentUser });
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -267,7 +418,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateUserProducts,
         updateProductBalance,
         addPurchasedProduct,
-        unlockHiddenCard
+        unlockHiddenCard,
+        updatePvPStats
       }}
     >
       {children}

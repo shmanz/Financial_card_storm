@@ -68,7 +68,19 @@ Railway 대시보드 → **Settings** 탭:
 3. 배포 완료 후 **Settings** → **Generate Domain** 클릭
 4. 생성된 URL 확인 (예: `https://financial-card-storm-backend-production.up.railway.app`)
 
-### 7단계: 프론트엔드 환경 변수 설정
+### 7단계: PostgreSQL 데이터베이스 추가 (선택사항)
+
+**데이터 영구 저장을 원한다면:**
+
+1. Railway 프로젝트에서 **"New"** → **"Database"** → **"Add PostgreSQL"** 선택
+2. PostgreSQL 서비스 생성 완료 후 **"Variables"** 탭에서 `DATABASE_URL` 확인
+3. 백엔드 서비스의 **Variables** 탭에 `DATABASE_URL` 추가
+4. PostgreSQL 서비스의 **"Query"** 탭에서 `server/schema.sql` 실행
+5. 서버 재배포
+
+**자세한 내용**: `DEPLOYMENT_ARCHITECTURE.md` 참조
+
+### 8단계: 프론트엔드 환경 변수 설정
 
 **Vercel 배포 시:**
 
@@ -77,6 +89,7 @@ Railway 대시보드 → **Settings** 탭:
 
 ```env
 VITE_SOCKET_URL=https://your-railway-url.up.railway.app
+VITE_API_URL=https://your-railway-url.up.railway.app
 ```
 
 3. **Redeploy** 실행
@@ -87,6 +100,7 @@ VITE_SOCKET_URL=https://your-railway-url.up.railway.app
 
 ```env
 VITE_SOCKET_URL=https://your-railway-url.up.railway.app
+VITE_API_URL=https://your-railway-url.up.railway.app
 ```
 
 ---
@@ -227,3 +241,4 @@ Railway/Render에서 배포 실패
 - [Railway 문서](https://docs.railway.app)
 - [Render 문서](https://render.com/docs)
 - [Socket.IO 배포 가이드](https://socket.io/docs/v4/deployment/)
+

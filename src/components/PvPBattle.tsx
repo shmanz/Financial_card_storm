@@ -53,7 +53,7 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
   onOpenBanking,
   onBack
 }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, updatePvPStats } = useAuth();
   
   // 상대 플레이어 상태
   const [opponentHp, setOpponentHp] = useState(20);
@@ -61,6 +61,28 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
   const [opponentShield, setOpponentShield] = useState(0);
   const [opponentStatusEffects, setOpponentStatusEffects] = useState<StatusEffect[]>([]);
   const [opponentEnergy, setOpponentEnergy] = useState(1);
+  
+  // 애니메이션 이펙트 상태
+  const [opponentDamageEffect, setOpponentDamageEffect] = useState(0);
+  const [opponentHealEffect, setOpponentHealEffect] = useState(0);
+  const [opponentShieldEffect, setOpponentShieldEffect] = useState(0);
+  const [myDamageEffect, setMyDamageEffect] = useState(0);
+  const [myHealEffect, setMyHealEffect] = useState(0);
+  const [myShieldEffect, setMyShieldEffect] = useState(0);
+  
+  // 이전 HP 추적 (변화 감지용)
+  const prevOpponentHp = React.useRef(20);
+  const prevOpponentShield = React.useRef(0);
+  const prevMyHp = React.useRef(20);
+  const prevMyShield = React.useRef(0);
+  
+  // 초기화
+  useEffect(() => {
+    prevOpponentHp.current = opponentHp;
+    prevMyHp.current = gameState.playerHp;
+    prevOpponentShield.current = opponentShield;
+    prevMyShield.current = gameState.playerShield;
+  }, []);
 
   useEffect(() => {
     if (!socket) return;
@@ -147,14 +169,39 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
       
       // 상대 상태 업데이트 (상대가 회복/실드 등을 받았을 수 있음)
       if (data.attackerHp !== undefined) {
-        console.log('[PvP] 상대(공격자) 상태 업데이트 - HP:', data.attackerHp, 'Shield:', data.attackerShield);
-        setOpponentHp(data.attackerHp);
-        setOpponentShield(data.attackerShield || 0);
+        const newHp = data.attackerHp;
+        const newShield = data.attackerShield || 0;
+        
+        // HP 변화 감지
+        if (newHp > prevOpponentHp.current) {
+          const heal = newHp - prevOpponentHp.current;
+          setOpponentHealEffect(heal);
+        }
+        
+        // 실드 변화 감지
+        if (newShield > prevOpponentShield.current) {
+          const shieldGain = newShield - prevOpponentShield.current;
+          setOpponentShieldEffect(shieldGain);
+        }
+        
+        prevOpponentHp.current = newHp;
+        prevOpponentShield.current = newShield;
+        
+        console.log('[PvP] 상대(공격자) 상태 업데이트 - HP:', newHp, 'Shield:', newShield);
+        setOpponentHp(newHp);
+        setOpponentShield(newShield);
       }
       
       // 상대가 준 피해를 내가 받음 - 무조건 호출!
-      console.log('[PvP] 🔥 피해 적용 함수 호출! damage:', data.damage);
-      onReceiveDamage(data.damage || 0, []); // effects는 빈 배열
+      const damage = data.damage || 0;
+      console.log('[PvP] 🔥 피해 적용 함수 호출! damage:', damage);
+      
+      // 피해 이펙트 트리거
+      if (damage > 0) {
+        setMyDamageEffect(damage);
+      }
+      
+      onReceiveDamage(damage, []); // effects는 빈 배열
     });
 
     // ========================================
@@ -164,6 +211,8 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
     socket.on('game:end', (data) => {
       console.log('[PvP] 게임 종료:', data.winner);
       // 승패 처리
+      // data.winner가 'player1' 또는 'player2'일 수 있음
+      // 현재 사용자가 이겼는지 확인해야 함
     });
 
     // ========================================
@@ -193,7 +242,64 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
       socket.off('game:roundComplete');
       socket.off('game:playerLeft');
     };
-  }, [socket, onTurnReceived, gameState.playerHp, opponentHp, opponentShield, opponentEnergy]);
+  }, [socket, onTurnReceived, gameState.playerHp, opponentHp, opponentShield, opponentEnergy, onReceiveDamage]);
+  
+  // 내 HP/실드 변화 감지 (카드 사용 후)
+  useEffect(() => {
+    const hpDiff = gameState.playerHp - prevMyHp.current;
+    const shieldDiff = gameState.playerShield - prevMyShield.current;
+    
+    if (hpDiff > 0) {
+      setMyHealEffect(hpDiff);
+    }
+    if (shieldDiff > 0) {
+      setMyShieldEffect(shieldDiff);
+    }
+    
+    prevMyHp.current = gameState.playerHp;
+    prevMyShield.current = gameState.playerShield;
+  }, [gameState.playerHp, gameState.playerShield]);
+  
+  // 상대 HP 감소 감지 (내가 공격할 때 - gameState.bossHp 변화)
+  useEffect(() => {
+    if (gameState.bossHp < prevOpponentHp.current && isMyTurn) {
+      const damage = prevOpponentHp.current - gameState.bossHp;
+      setOpponentDamageEffect(damage);
+      // 상대 HP 상태도 업데이트 (애니메이션과 동기화)
+      setOpponentHp(gameState.bossHp);
+    }
+    prevOpponentHp.current = gameState.bossHp;
+  }, [gameState.bossHp, isMyTurn]);
+  
+  // stateSync로 받은 상대 HP 변화 감지
+  useEffect(() => {
+    if (opponentHp !== prevOpponentHp.current) {
+      // stateSync로 받은 경우는 애니메이션 없이 업데이트만
+      prevOpponentHp.current = opponentHp;
+    }
+  }, [opponentHp]);
+  
+  // 게임 종료 시 승/패 기록 (PvP 모드만) - 한 번만 실행
+  const recordedGameRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (gameState.isGameOver && gameState.winner && updatePvPStats && currentUser) {
+      // Guest 사용자는 기록하지 않음
+      if (currentUser.id.includes('guest')) return;
+      
+      // 이미 기록한 게임인지 확인 (게임 ID = roomId + turn + winner)
+      const gameId = `${roomId}-${gameState.turn}-${gameState.winner}`;
+      if (recordedGameRef.current === gameId) {
+        console.log('[PvP] 이미 기록된 게임, 스킵');
+        return;
+      }
+      
+      const won = gameState.winner === 'PLAYER';
+      console.log('[PvP] 승/패 기록 시작:', won ? '승리' : '패배', 'gameId:', gameId);
+      updatePvPStats(won);
+      recordedGameRef.current = gameId;
+      console.log('[PvP] 승/패 기록 완료:', won ? '승리' : '패배');
+    }
+  }, [gameState.isGameOver, gameState.winner, gameState.turn, roomId, updatePvPStats, currentUser]);
 
   // ========================================
   // 내 상태를 상대에게 실시간 전송 (무한 루프 방지)
@@ -240,11 +346,20 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
   if (!currentUser) return null;
 
   return (
-    <div className="flex h-screen max-h-screen flex-col gap-1 overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-1 sm:gap-3 sm:p-4">
-      {/* 디버그 정보 - 모바일에서 숨김 */}
-      <div className="hidden rounded border border-purple-500/50 bg-purple-900/20 p-2 text-xs text-purple-200 sm:block">
-        <strong>PvP 디버그:</strong> 내 턴 = {isMyTurn ? 'YES' : 'NO'} | 턴 #{gameState.turn} | 모드 = {gameState.gameMode} | 피로도 = {gameState.fatigue}
-      </div>
+    <div className="fixed inset-0 z-10 flex h-screen max-h-screen flex-col gap-1 overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-1 sm:gap-3 sm:p-4">
+      <style>{`
+        /* 버튼 영역이 항상 보이도록 보장 */
+        .pvp-action-buttons {
+          flex-shrink: 0 !important;
+          min-width: fit-content !important;
+        }
+        /* 나가기 버튼이 항상 보이도록 */
+        .pvp-action-buttons button {
+          flex-shrink: 0 !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+        }
+      `}</style>
 
       {/* 상단: 상대 플레이어 (기존 보스 위치) */}
       <section className="flex items-start justify-between gap-1.5 flex-shrink-0 sm:gap-3">
@@ -257,6 +372,9 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
             shield={opponentShield}
             statusEffects={opponentStatusEffects}
             description="상대 플레이어"
+            damageEffect={opponentDamageEffect}
+            healEffect={opponentHealEffect}
+            shieldEffect={opponentShieldEffect}
           />
         </div>
         <div className="text-right text-[9px] text-slate-300 flex-shrink-0 sm:text-[11px]">
@@ -270,7 +388,7 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
       </section>
 
       {/* 중앙: 전장 + 사이드바 */}
-      <section className="flex flex-1 min-h-0 flex-col gap-1 sm:gap-3 md:flex-row overflow-hidden">
+      <section className="flex flex-1 min-h-0 flex-col gap-1 sm:gap-3 md:flex-row overflow-x-hidden overflow-y-auto items-start">
         {/* 전장 + 로그 */}
         <div className="flex flex-1 min-h-0 flex-col space-y-1 sm:space-y-3">
           <div className="rounded-lg border border-slate-700/80 bg-gradient-to-b from-slate-800/80 via-slate-900/90 to-slate-950 p-1 flex-shrink-0 sm:rounded-2xl sm:p-3">
@@ -303,32 +421,32 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
         </div>
 
         {/* 우측: 에너지 + 행동 */}
-        <div className="flex w-full flex-row gap-1 flex-shrink-0 sm:gap-3 md:w-52 md:flex-col">
-          <div className="h-24 w-16 sm:h-40 sm:w-24 md:h-auto md:w-full">
+        <div className="pvp-action-buttons flex w-full flex-row gap-1 flex-shrink-0 sm:gap-3 md:w-52 md:flex-col relative z-20 self-start">
+          <div className="h-24 w-16 flex-shrink-0 sm:h-40 sm:w-24 md:h-auto md:w-full">
             <EnergyBar current={gameState.currentEnergy} max={gameState.maxEnergy} />
           </div>
-          <div className="flex flex-1 flex-col gap-1 rounded-lg border border-slate-700/80 bg-slate-900/90 p-1.5 text-[9px] sm:gap-2 sm:rounded-2xl sm:p-3 sm:text-[11px]">
+          <div className="flex flex-shrink-0 flex-col gap-1 rounded-lg border border-slate-700/80 bg-slate-900/90 p-1.5 text-[9px] sm:gap-2 sm:rounded-2xl sm:p-3 sm:text-[11px] min-w-[80px] sm:min-w-[120px] md:min-w-0 overflow-visible h-auto">
             <button
               type="button"
               onClick={onEndTurn}
               disabled={!isMyTurn || gameState.isGameOver}
-              className="w-full rounded-md bg-amber-500 px-2 py-1.5 text-[9px] font-semibold text-slate-950 shadow hover:bg-amber-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300 sm:px-3 sm:py-2 sm:text-xs touch-manipulation"
+              className="w-full flex-shrink-0 rounded-md bg-amber-500 px-2 py-1.5 text-[9px] font-semibold text-slate-950 shadow hover:bg-amber-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300 sm:px-3 sm:py-2 sm:text-xs touch-manipulation whitespace-nowrap"
             >
               {isMyTurn ? '턴 종료' : '대기'}
             </button>
             <button
               type="button"
               onClick={onBack}
-              className="w-full rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-[9px] font-semibold text-slate-100 hover:bg-slate-800 sm:px-3 sm:py-1.5 sm:text-[11px] touch-manipulation"
+              className="w-full flex-shrink-0 rounded-md border border-slate-600 bg-slate-900 px-2 py-1 text-[9px] font-semibold text-slate-100 hover:bg-slate-800 sm:px-3 sm:py-1.5 sm:text-[11px] touch-manipulation whitespace-nowrap relative z-30"
             >
-              나가기
+              로비로 나가기
             </button>
           </div>
         </div>
       </section>
 
       {/* 하단: 나 + 손패 */}
-      <section className="rounded-lg bg-gradient-to-t from-slate-950 via-slate-900 to-slate-900/80 p-1 flex-shrink-0 sm:rounded-2xl sm:p-3">
+      <section className="rounded-lg bg-gradient-to-t from-slate-950 via-slate-900 to-slate-900/80 p-1 flex-shrink-0 sm:rounded-2xl sm:p-3 relative z-10">
         <div className="mb-1 flex items-center justify-between gap-1.5 sm:mb-2 sm:gap-3">
           <div className="w-40 max-w-full sm:w-64">
             <HeroPanel
@@ -338,6 +456,9 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
               shield={gameState.playerShield}
               statusEffects={gameState.playerStatusEffects}
               description="당신"
+              damageEffect={myDamageEffect}
+              healEffect={myHealEffect}
+              shieldEffect={myShieldEffect}
             />
           </div>
         </div>
@@ -368,12 +489,6 @@ export const PvPBattle: React.FC<PvPBattleProps> = ({
                 : '더 강해져서 돌아오세요'}
             </p>
             
-            {/* 디버그 정보 - 모바일에서 숨김 */}
-            <div className="hidden mb-3 rounded bg-slate-800/50 p-2 text-xs text-left text-slate-400 sm:block">
-              <div>승자: {gameState.winner}</div>
-              <div>히든카드 보유: {hasHiddenCard ? 'YES' : 'NO'}</div>
-              <div>버튼 표시 조건: {gameState.winner === 'BOSS' && !hasHiddenCard ? 'TRUE' : 'FALSE'}</div>
-            </div>
             
             {/* 패배 시 오픈뱅킹 버튼 */}
             {gameState.winner === 'BOSS' && !hasHiddenCard && (

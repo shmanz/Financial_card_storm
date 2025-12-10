@@ -12,6 +12,7 @@ import { BankProduct } from '../data/mockUsers';
 interface AccountOverviewProps {
   bankProducts: BankProduct[];
   userName: string;
+  onShowTransactionHistory?: () => void;
 }
 
 // 상품 타입별 이모지 및 한글명
@@ -24,7 +25,7 @@ const PRODUCT_INFO: Record<string, { emoji: string; label: string; color: string
   LOAN: { emoji: '⚡', label: '대출', color: 'from-red-500 to-orange-500' }
 };
 
-export const AccountOverview: React.FC<AccountOverviewProps> = ({ bankProducts, userName }) => {
+export const AccountOverview: React.FC<AccountOverviewProps> = ({ bankProducts, userName, onShowTransactionHistory }) => {
   // 신한금융그룹 상품 필터링 (신한은행, 신한카드, 신한투자증권, 신한생명 등)
   const shinhanProducts = bankProducts.filter(p => 
     p.provider.includes('신한')
@@ -112,10 +113,20 @@ export const AccountOverview: React.FC<AccountOverviewProps> = ({ bankProducts, 
           return (
             <motion.div
               key={type}
-              className="rounded-xl border border-slate-700 bg-slate-900/70 p-4 hover:bg-slate-800/70"
+              className={`rounded-xl border border-slate-700 bg-slate-900/70 p-4 transition-all ${
+                type === 'DEPOSIT' && onShowTransactionHistory 
+                  ? 'group cursor-pointer hover:bg-slate-800/70 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/20' 
+                  : 'hover:bg-slate-800/70'
+              }`}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               whileHover={{ scale: 1.02 }}
+              onClick={() => {
+                // 예금/입출금 상품만 클릭 시 거래 내역 표시
+                if (type === 'DEPOSIT' && onShowTransactionHistory) {
+                  onShowTransactionHistory();
+                }
+              }}
             >
               <div className="mb-2 flex items-center gap-2">
                 <div className={`rounded-lg bg-gradient-to-br ${info.color} p-2 text-2xl shadow-lg`}>
@@ -125,6 +136,11 @@ export const AccountOverview: React.FC<AccountOverviewProps> = ({ bankProducts, 
                   <div className="text-sm font-bold text-slate-100">{info.label}</div>
                   <div className="text-xs text-slate-400">{count}개 상품</div>
                 </div>
+                {type === 'DEPOSIT' && onShowTransactionHistory && (
+                  <div className="text-xs text-cyan-400 opacity-70 group-hover:opacity-100">
+                    거래 내역 →
+                  </div>
+                )}
               </div>
               
               {totalValue > 0 && (

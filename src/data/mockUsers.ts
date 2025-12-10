@@ -37,6 +37,24 @@ export interface UserProfile {
   purchasedShopProducts?: string[];
   // 카드 상점에서 획득한 카드 (개인별)
   purchasedCards?: Card[];
+  // PvP 전적 통계
+  pvpStats?: {
+    wins: number;
+    losses: number;
+    totalGames: number;
+    winRate: number; // 승률 (0-1)
+    // 주 단위 전적 기록
+    weeklyRecords?: {
+      week: string; // "2024-W01" 형식
+      wins: number;
+      losses: number;
+      winRate: number;
+    }[];
+    // 최근 업데이트 시간
+    lastUpdated?: Date;
+  };
+  // 명예의 전당 보상 카드
+  hallOfFameRewards?: string[]; // 주차별로 획득한 보상 카드 ID
 }
 
 // Card 타입 임포트를 위한 임시 정의 (순환 참조 방지)

@@ -4,6 +4,7 @@
  * ========================================
  */
 
+require('dotenv').config();
 const express = require('express');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
@@ -362,6 +363,22 @@ app.get('/api/health', (req, res) => {
 app.get('/api/rooms', (req, res) => {
   res.json({ rooms: getRoomList() });
 });
+
+// 사용자 관련 API (데이터베이스 연동)
+if (process.env.DATABASE_URL) {
+  const usersRouter = require('./api/users');
+  const cardsRouter = require('./api/cards');
+  const pvpRouter = require('./api/pvp');
+  
+  app.use('/api/users', usersRouter);
+  app.use('/api/cards', cardsRouter);
+  app.use('/api/pvp', pvpRouter);
+  
+  console.log('[API] ✅ 데이터베이스 API 활성화 (사용자, 카드, PvP 통계)');
+} else {
+  console.log('[API] ⚠️  DATABASE_URL이 설정되지 않아 데이터베이스 API가 비활성화되었습니다.');
+  console.log('[API]    로컬 개발 시 .env 파일에 DATABASE_URL을 추가하세요.');
+}
 
 // ========================================
 // 서버 시작

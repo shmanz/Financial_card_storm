@@ -14,16 +14,17 @@ import { OpenBankingPopup } from './components/OpenBankingPopup';
 import { AccountOverview } from './components/AccountOverview';
 import { DeckManager } from './components/DeckManager';
 import { CardShop } from './components/CardShop';
+import { HallOfFame } from './components/HallOfFame';
 import { useSocket } from './hooks/useSocket';
 import { useAuth } from './contexts/AuthContext';
 import { Card } from './types/game';
 import { BankProduct } from './data/mockUsers';
 import { STARTER_DECK } from './data/starterCards';
 
-type Screen = 'MAIN' | 'BATTLE' | 'MULTIPLAYER_LOBBY' | 'MULTIPLAYER_BATTLE' | 'ACCOUNT' | 'DECK_MANAGER' | 'CARD_SHOP';
+type Screen = 'MAIN' | 'BATTLE' | 'MULTIPLAYER_LOBBY' | 'MULTIPLAYER_BATTLE' | 'ACCOUNT' | 'DECK_MANAGER' | 'CARD_SHOP' | 'HALL_OF_FAME';
 
 const App: React.FC = () => {
-  const { currentUser, isAuthenticated, isGuest, logout, updateProductBalance, addPurchasedProduct, updateUserProducts } = useAuth();
+  const { currentUser, isAuthenticated, isGuest, logout, updateProductBalance, addPurchasedProduct, updateUserProducts, updatePvPStats } = useAuth();
   
   // State 선언 (먼저!)
   const [screen, setScreen] = useState<Screen>('MAIN');
@@ -270,9 +271,83 @@ const App: React.FC = () => {
   }, [battleDeck]);
 
   const [state, dispatch] = useReducer(gameReducer, initialState);
+  
+  // 싱글 플레이 모드 이펙트 상태
+  const [playerDamageEffect, setPlayerDamageEffect] = useState(0);
+  const [playerHealEffect, setPlayerHealEffect] = useState(0);
+  const [playerShieldEffect, setPlayerShieldEffect] = useState(0);
+  const [bossDamageEffect, setBossDamageEffect] = useState(0);
+  const [bossHealEffect, setBossHealEffect] = useState(0);
+  const [bossShieldEffect, setBossShieldEffect] = useState(0);
+  
+  // 이전 HP/실드 추적
+  const prevPlayerHp = React.useRef(20);
+  const prevPlayerShield = React.useRef(0);
+  const prevBossHp = React.useRef(20);
+  const prevBossShield = React.useRef(0);
 
   // Socket.IO 연결 (멀티플레이 모드용)
   const { socket, connected } = useSocket();
+  
+  // 싱글 플레이 모드: 플레이어 HP/실드 변화 감지
+  React.useEffect(() => {
+    if (screen !== 'BATTLE') return;
+    
+    const hpDiff = state.playerHp - prevPlayerHp.current;
+    const shieldDiff = state.playerShield - prevPlayerShield.current;
+    
+    if (hpDiff < 0) {
+      // 피해
+      const damage = -hpDiff;
+      setPlayerDamageEffect(damage);
+    } else if (hpDiff > 0) {
+      // 회복
+      setPlayerHealEffect(hpDiff);
+    }
+    
+    if (shieldDiff > 0) {
+      // 실드 획득
+      setPlayerShieldEffect(shieldDiff);
+    }
+    
+    prevPlayerHp.current = state.playerHp;
+    prevPlayerShield.current = state.playerShield;
+  }, [state.playerHp, state.playerShield, screen]);
+  
+  // 싱글 플레이 모드: 보스 HP/실드 변화 감지
+  React.useEffect(() => {
+    if (screen !== 'BATTLE') return;
+    
+    const hpDiff = state.bossHp - prevBossHp.current;
+    const shieldDiff = state.bossShield - prevBossShield.current;
+    
+    if (hpDiff < 0) {
+      // 피해
+      const damage = -hpDiff;
+      setBossDamageEffect(damage);
+    } else if (hpDiff > 0) {
+      // 회복
+      setBossHealEffect(hpDiff);
+    }
+    
+    if (shieldDiff > 0) {
+      // 실드 획득
+      setBossShieldEffect(shieldDiff);
+    }
+    
+    prevBossHp.current = state.bossHp;
+    prevBossShield.current = state.bossShield;
+  }, [state.bossHp, state.bossShield, screen]);
+  
+  // 게임 시작 시 초기화
+  React.useEffect(() => {
+    if (screen === 'BATTLE') {
+      prevPlayerHp.current = state.playerHp;
+      prevPlayerShield.current = state.playerShield;
+      prevBossHp.current = state.bossHp;
+      prevBossShield.current = state.bossShield;
+    }
+  }, [screen]);
 
   // PvP 모드에서 state 변경 감지해서 자동 동기화 (무한 루프 방지)
   // 주의: PvPBattle.tsx에서 더 세밀한 제어를 하므로 여기서는 제거
@@ -378,13 +453,6 @@ const App: React.FC = () => {
                 회원가입하기
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => setShowTxPreview(true)}
-              className="rounded-md border border-cyan-500/70 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-cyan-100 hover:bg-slate-800"
-            >
-              내 거래 내역
-            </button>
             {!isGuest && (
               <button
                 type="button"
@@ -516,26 +584,33 @@ const App: React.FC = () => {
                 </div>
               </button>
 
-              {/* 거래 내역 카드 */}
+              {/* 명예의 전당 카드 */}
               <button
-                onClick={() => setShowTxPreview(true)}
-                className="group rounded-2xl border-2 border-slate-700 bg-gradient-to-br from-green-900/40 to-emerald-900/40 p-6 text-left hover:border-green-500 hover:shadow-lg hover:shadow-green-500/20 transition-all"
+                onClick={() => setScreen('HALL_OF_FAME')}
+                className="group rounded-2xl border-2 border-slate-700 bg-gradient-to-br from-amber-900/40 to-yellow-900/40 p-6 text-left hover:border-amber-500 hover:shadow-lg hover:shadow-amber-500/20 transition-all"
               >
                 <div className="mb-3 flex items-center gap-3">
-                  <div className="rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 p-3 text-3xl shadow-lg">
-                    📊
+                  <div className="rounded-xl bg-gradient-to-br from-amber-500 to-yellow-500 p-3 text-3xl shadow-lg">
+                    🏆
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-green-100">거래 내역</h3>
-                    <p className="text-xs text-slate-400">소비 패턴 분석</p>
+                    <h3 className="text-lg font-bold text-amber-100">명예의 전당</h3>
+                    <p className="text-xs text-slate-400">주간 승률 랭킹</p>
                   </div>
                 </div>
                 <div className="space-y-1 text-sm text-slate-300">
-                  <div>• 거래 건수: {currentUser.transactions.length}건</div>
-                  <div>• 분석 기간: 최근 90일</div>
+                  {currentUser?.pvpStats ? (
+                    <>
+                      <div>• 내 전적: {currentUser.pvpStats.wins}승 {currentUser.pvpStats.losses}패</div>
+                      <div>• 승률: {(currentUser.pvpStats.winRate * 100).toFixed(1)}%</div>
+                    </>
+                  ) : (
+                    <div>• PvP 승/패 통계</div>
+                  )}
+                  <div>• 주간 1위 보상 카드</div>
                 </div>
-                <div className="mt-4 text-xs text-green-400 group-hover:text-green-300">
-                  클릭하여 상세 분석 →
+                <div className="mt-4 text-xs text-amber-400 group-hover:text-amber-300">
+                  클릭하여 랭킹 보기 →
                 </div>
               </button>
 
@@ -579,6 +654,7 @@ const App: React.FC = () => {
             <AccountOverview
               bankProducts={currentUser.bankProducts}
               userName={currentUser.name}
+              onShowTransactionHistory={() => setShowTxPreview(true)}
             />
           </div>
         )}
@@ -621,6 +697,11 @@ const App: React.FC = () => {
               purchasedProducts={currentUser.purchasedShopProducts || []}
             />
           </div>
+        )}
+
+        {/* Hall of Fame Screen */}
+        {screen === 'HALL_OF_FAME' && (
+          <HallOfFame onClose={() => setScreen('MAIN')} />
         )}
 
         {/* Multiplayer Lobby */}
@@ -706,6 +787,9 @@ const App: React.FC = () => {
                   shield={state.bossShield}
                   statusEffects={state.bossStatusEffects}
                   description="당신의 지출 습관을 시험하는 데이터 기반 보스입니다."
+                  damageEffect={bossDamageEffect}
+                  healEffect={bossHealEffect}
+                  shieldEffect={bossShieldEffect}
                 />
               </div>
               <div className="hidden text-right text-[11px] text-slate-300 sm:block">
@@ -752,22 +836,18 @@ const App: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={handleRestart}
+                    onClick={() => setScreen('MAIN')}
                     className="w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-slate-100 hover:bg-slate-800"
                   >
-                    다시 시작
+                    로비로 가기
                   </button>
                   <button
                     type="button"
-                    onClick={() => setScreen('MAIN')}
+                    onClick={handleRestart}
                     className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-[11px] text-slate-300 hover:bg-slate-900"
                   >
-                    메인 화면으로
+                    다시 시작
                   </button>
-                  <div className="mt-1 text-[10px] text-slate-400">
-                    앞으로 이 영역에 실제 은행/카드 연동 설정, 소비 패턴 리포트, LLM 기반
-                    추천 메시지를 붙일 수 있습니다.
-                  </div>
                 </div>
               </div>
             </section>
@@ -783,6 +863,9 @@ const App: React.FC = () => {
                     shield={state.playerShield}
                     statusEffects={state.playerStatusEffects}
                     description="당신의 은행 계좌를 대표하는 영웅입니다."
+                    damageEffect={playerDamageEffect}
+                    healEffect={playerHealEffect}
+                    shieldEffect={playerShieldEffect}
                   />
                 </div>
                 <div className="hidden text-right text-[10px] text-slate-300 sm:block">

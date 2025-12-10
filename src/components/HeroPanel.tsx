@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { StatusEffect } from '../types/game';
 
@@ -10,6 +10,9 @@ interface HeroPanelProps {
   statusEffects?: StatusEffect[];
   description?: string;
   isBoss?: boolean;
+  damageEffect?: number; // 피해 애니메이션 트리거
+  healEffect?: number; // 회복 애니메이션 트리거
+  shieldEffect?: number; // 실드 애니메이션 트리거
 }
 
 // 상태 효과 아이콘 매핑
@@ -30,22 +33,127 @@ export const HeroPanel: React.FC<HeroPanelProps> = ({
   shield = 0,
   statusEffects = [],
   description,
-  isBoss
+  isBoss,
+  damageEffect = 0,
+  healEffect = 0,
+  shieldEffect = 0
 }) => {
   const ratio = Math.max(0, Math.min(1, hp / maxHp));
   const isLowHp = ratio < 0.3;
+  
+  // 이펙트 상태 관리
+  const [showDamageNumber, setShowDamageNumber] = useState<number | null>(null);
+  const [showHealNumber, setShowHealNumber] = useState<number | null>(null);
+  const [showShieldNumber, setShowShieldNumber] = useState<number | null>(null);
+  const [shakeKey, setShakeKey] = useState(0);
+  const [flashKey, setFlashKey] = useState(0);
+  
+  // 피해 이펙트
+  useEffect(() => {
+    if (damageEffect > 0) {
+      setShowDamageNumber(damageEffect);
+      setShakeKey(prev => prev + 1);
+      setFlashKey(prev => prev + 1);
+      setTimeout(() => setShowDamageNumber(null), 1000);
+    }
+  }, [damageEffect]);
+  
+  // 회복 이펙트
+  useEffect(() => {
+    if (healEffect > 0) {
+      setShowHealNumber(healEffect);
+      setTimeout(() => setShowHealNumber(null), 1000);
+    }
+  }, [healEffect]);
+  
+  // 실드 이펙트
+  useEffect(() => {
+    if (shieldEffect > 0) {
+      setShowShieldNumber(shieldEffect);
+      setTimeout(() => setShowShieldNumber(null), 1000);
+    }
+  }, [shieldEffect]);
 
   return (
     <motion.div
-      className={`flex flex-col rounded-lg border px-1.5 py-1 shadow-md sm:rounded-2xl sm:px-4 sm:py-3 ${
+      key={shakeKey}
+      className={`relative flex flex-col rounded-lg border px-1.5 py-1 shadow-md sm:rounded-2xl sm:px-4 sm:py-3 ${
         isBoss
           ? 'border-rose-500/60 bg-gradient-to-b from-rose-900/70 to-slate-900/80'
           : 'border-cyan-500/60 bg-gradient-to-b from-slate-800 to-slate-900'
       }`}
       initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
+      animate={{ 
+        opacity: 1, 
+        y: 0,
+        x: damageEffect > 0 ? [0, -5, 5, -5, 5, 0] : 0,
+      }}
+      transition={{ 
+        duration: damageEffect > 0 ? 0.3 : 0.5,
+        x: { duration: 0.3 }
+      }}
     >
+      {/* 피해 플래시 오버레이 */}
+      {flashKey > 0 && damageEffect > 0 && (
+        <motion.div
+          key={flashKey}
+          className="absolute inset-0 rounded-lg bg-red-500/40 sm:rounded-2xl pointer-events-none"
+          initial={{ opacity: 0.8 }}
+          animate={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
+        />
+      )}
+      
+      {/* 피해 숫자 이펙트 */}
+      <AnimatePresence>
+        {showDamageNumber !== null && (
+          <motion.div
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10"
+            initial={{ scale: 0, y: 0, opacity: 0 }}
+            animate={{ scale: 1.5, y: -30, opacity: 1 }}
+            exit={{ scale: 0.5, y: -50, opacity: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <span className="text-3xl font-black text-red-400 drop-shadow-lg">
+              -{showDamageNumber}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* 회복 숫자 이펙트 */}
+      <AnimatePresence>
+        {showHealNumber !== null && (
+          <motion.div
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10"
+            initial={{ scale: 0, y: 0, opacity: 0 }}
+            animate={{ scale: 1.5, y: -30, opacity: 1 }}
+            exit={{ scale: 0.5, y: -50, opacity: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <span className="text-3xl font-black text-green-400 drop-shadow-lg">
+              +{showHealNumber}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* 실드 숫자 이펙트 */}
+      <AnimatePresence>
+        {showShieldNumber !== null && (
+          <motion.div
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10"
+            initial={{ scale: 0, y: 0, opacity: 0 }}
+            animate={{ scale: 1.5, y: -30, opacity: 1 }}
+            exit={{ scale: 0.5, y: -50, opacity: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <span className="text-2xl font-black text-sky-400 drop-shadow-lg">
+              🛡️ +{showShieldNumber}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <div className="flex items-center justify-between gap-1 sm:gap-3">
         <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-1">
           {/* 캐릭터 아이콘 */}

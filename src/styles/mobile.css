@@ -43,18 +43,4 @@ button, .card-view {
     min-height: 44px;
     min-width: 44px;
   }
-  
-  /* iPhone 16 Pro 최적화 (393x852) */
-  body {
-    overflow: hidden;
-    position: fixed;
-    width: 100%;
-    height: 100%;
-  }
-  
-  #root {
-    height: 100vh;
-    height: 100dvh; /* 동적 뷰포트 높이 */
-    overflow: hidden;
-  }
 }
