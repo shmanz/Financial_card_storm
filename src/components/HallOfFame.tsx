@@ -63,10 +63,10 @@ export const HallOfFame: React.FC<HallOfFameProps> = ({ onClose }) => {
     
     loadRanking();
     
-    // 주기적으로 랭킹 갱신 (30초마다)
+    // 주기적으로 랭킹 갱신 (5초마다 - 실시간 순위 변동 반영)
     const interval = setInterval(() => {
       loadRanking();
-    }, 30000);
+    }, 5000);
     
     return () => clearInterval(interval);
   }, [currentUser, addPurchasedProduct]);
@@ -142,13 +142,17 @@ export const HallOfFame: React.FC<HallOfFameProps> = ({ onClose }) => {
           </div>
         )}
 
-        {/* 랭킹 리스트 (1~3위) */}
+        {/* 랭킹 리스트 (실시간 순위 변동) */}
         <div className="space-y-2">
           <div className="flex items-center justify-between px-4 py-2 text-xs font-semibold text-slate-400 border-b border-slate-700">
             <div className="w-12">순위</div>
             <div className="flex-1">플레이어</div>
             <div className="w-24 text-center">전적</div>
             <div className="w-20 text-center">승률</div>
+          </div>
+          <div className="text-[10px] text-slate-500 text-center py-1 flex items-center justify-center gap-1">
+            <span className="animate-pulse">⚡</span>
+            <span>실시간 업데이트 (5초마다 갱신)</span>
           </div>
 
           {loading ? (

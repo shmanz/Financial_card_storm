@@ -301,108 +301,171 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return `${d.getUTCFullYear()}-W${weekNo.toString().padStart(2, '0')}`;
   };
 
-  const updatePvPStats = (won: boolean) => {
+  const updatePvPStats = async (won: boolean) => {
     if (!currentUser) return;
 
     console.log('[PvP 통계] 업데이트 시작:', currentUser.name, won ? '승리' : '패배');
 
-    // MOCK_USERS에서 해당 사용자 찾기 (데이터 영구 저장)
-    const userInDb = MOCK_USERS.find(u => u.id === currentUser.id);
-    if (!userInDb) {
-      console.error('[PvP 통계] MOCK_USERS에서 사용자를 찾을 수 없음:', currentUser.id);
+    // Guest 사용자는 기록하지 않음
+    if (currentUser.id.includes('guest')) {
+      console.log('[PvP 통계] Guest 사용자, 기록 스킵');
       return;
-    }
-
-    // localStorage에서 저장된 통계 가져오기 (영구 저장)
-    const storageKey = `pvpStats_${currentUser.id}`;
-    let stats = JSON.parse(localStorage.getItem(storageKey) || 'null');
-    
-    // 통계 초기화 (없으면)
-    if (!stats) {
-      stats = {
-        wins: 0,
-        losses: 0,
-        totalGames: 0,
-        winRate: 0,
-        weeklyRecords: [],
-        lastUpdated: new Date().toISOString()
-      };
     }
 
     const now = new Date();
     const currentWeek = getWeekNumber(now);
 
-    // 전체 통계 업데이트
-    const beforeWins = stats.wins;
-    const beforeLosses = stats.losses;
-    
-    if (won) {
-      stats.wins += 1;
-    } else {
-      stats.losses += 1;
-    }
-    stats.totalGames = stats.wins + stats.losses;
-    stats.winRate = stats.totalGames > 0 ? stats.wins / stats.totalGames : 0;
-    stats.lastUpdated = now.toISOString();
-
-    console.log('[PvP 통계] 전체 통계:', `${beforeWins}승 ${beforeLosses}패 → ${stats.wins}승 ${stats.losses}패`);
-
-    // 주 단위 기록 업데이트
-    if (!stats.weeklyRecords) {
-      stats.weeklyRecords = [];
-    }
-
-    let weekRecord = stats.weeklyRecords.find((r: any) => r.week === currentWeek);
-    if (!weekRecord) {
-      weekRecord = {
-        week: currentWeek,
-        wins: 0,
-        losses: 0,
-        winRate: 0
-      };
-      stats.weeklyRecords.push(weekRecord);
-    }
-
-    // 주 단위 통계 업데이트
-    const beforeWeekWins = weekRecord.wins;
-    const beforeWeekLosses = weekRecord.losses;
-    
-    if (won) {
-      weekRecord.wins += 1;
-    } else {
-      weekRecord.losses += 1;
-    }
-    const weekTotal = weekRecord.wins + weekRecord.losses;
-    weekRecord.winRate = weekTotal > 0 ? weekRecord.wins / weekTotal : 0;
-
-    console.log('[PvP 통계] 주간 통계:', `${beforeWeekWins}승 ${beforeWeekLosses}패 → ${weekRecord.wins}승 ${weekRecord.losses}패`);
-
-    // 오래된 주차 기록 정리 (최근 4주만 유지)
-    stats.weeklyRecords = stats.weeklyRecords
-      .sort((a: any, b: any) => b.week.localeCompare(a.week))
-      .slice(0, 4);
-
-    // localStorage에 영구 저장
-    localStorage.setItem(storageKey, JSON.stringify(stats));
-
-    // MOCK_USERS와 currentUser도 동기화
-    userInDb.pvpStats = {
-      wins: stats.wins,
-      losses: stats.losses,
-      totalGames: stats.totalGames,
-      winRate: stats.winRate,
-      weeklyRecords: stats.weeklyRecords,
-      lastUpdated: new Date(stats.lastUpdated)
+    // API URL 가져오기
+    const getApiUrl = () => {
+      const apiUrl = import.meta.env.VITE_API_URL;
+      if (apiUrl) {
+        return apiUrl.replace(/\/$/, '');
+      }
+      const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3002';
+      const url = new URL(socketUrl);
+      return `${url.protocol}//${url.host}`;
     };
 
-    currentUser.pvpStats = { ...userInDb.pvpStats };
+    const apiUrl = getApiUrl();
 
-    console.log('[PvP 통계] 업데이트 완료:', {
-      전체: `${stats.wins}승 ${stats.losses}패 (${(stats.winRate * 100).toFixed(1)}%)`,
-      이번주: `${weekRecord.wins}승 ${weekRecord.losses}패 (${(weekRecord.winRate * 100).toFixed(1)}%)`
-    });
+    try {
+      // 서버 API로 통계 업데이트 (데이터베이스에 저장)
+      const response = await fetch(`${apiUrl}/api/pvp/${currentUser.id}/stats`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          won,
+          week: currentWeek
+        })
+      });
 
-    setCurrentUser({ ...currentUser });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('[PvP 통계] 서버 업데이트 완료:', result);
+
+      // 서버에서 최신 통계 가져오기
+      const statsResponse = await fetch(`${apiUrl}/api/pvp/${currentUser.id}/stats`);
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json();
+        
+        // MOCK_USERS에서 해당 사용자 찾기
+        const userInDb = MOCK_USERS.find(u => u.id === currentUser.id);
+        if (userInDb) {
+          userInDb.pvpStats = {
+            wins: statsData.wins,
+            losses: statsData.losses,
+            totalGames: statsData.totalGames,
+            winRate: statsData.winRate,
+            weeklyRecords: statsData.weeklyRecords || [],
+            lastUpdated: statsData.lastUpdated ? new Date(statsData.lastUpdated) : new Date()
+          };
+        }
+
+        // currentUser도 업데이트
+        currentUser.pvpStats = {
+          wins: statsData.wins,
+          losses: statsData.losses,
+          totalGames: statsData.totalGames,
+          winRate: statsData.winRate,
+          weeklyRecords: statsData.weeklyRecords || [],
+          lastUpdated: statsData.lastUpdated ? new Date(statsData.lastUpdated) : new Date()
+        };
+
+        console.log('[PvP 통계] 클라이언트 동기화 완료:', {
+          전체: `${statsData.wins}승 ${statsData.losses}패 (${(statsData.winRate * 100).toFixed(1)}%)`,
+          이번주: statsData.weeklyRecords?.find((r: any) => r.week === currentWeek) 
+            ? `${statsData.weeklyRecords.find((r: any) => r.week === currentWeek).wins}승 ${statsData.weeklyRecords.find((r: any) => r.week === currentWeek).losses}패`
+            : '0승 0패'
+        });
+
+        setCurrentUser({ ...currentUser });
+      }
+    } catch (error) {
+      console.error('[PvP 통계] 서버 업데이트 실패, localStorage로 폴백:', error);
+      
+      // 서버 실패 시 localStorage에 저장 (폴백)
+      const storageKey = `pvpStats_${currentUser.id}`;
+      let stats = JSON.parse(localStorage.getItem(storageKey) || 'null');
+      
+      if (!stats) {
+        stats = {
+          wins: 0,
+          losses: 0,
+          totalGames: 0,
+          winRate: 0,
+          weeklyRecords: [],
+          lastUpdated: new Date().toISOString()
+        };
+      }
+
+      if (won) {
+        stats.wins += 1;
+      } else {
+        stats.losses += 1;
+      }
+      stats.totalGames = stats.wins + stats.losses;
+      stats.winRate = stats.totalGames > 0 ? stats.wins / stats.totalGames : 0;
+      stats.lastUpdated = now.toISOString();
+
+      // 주 단위 기록 업데이트
+      if (!stats.weeklyRecords) {
+        stats.weeklyRecords = [];
+      }
+
+      let weekRecord = stats.weeklyRecords.find((r: any) => r.week === currentWeek);
+      if (!weekRecord) {
+        weekRecord = {
+          week: currentWeek,
+          wins: 0,
+          losses: 0,
+          winRate: 0
+        };
+        stats.weeklyRecords.push(weekRecord);
+      }
+
+      if (won) {
+        weekRecord.wins += 1;
+      } else {
+        weekRecord.losses += 1;
+      }
+      const weekTotal = weekRecord.wins + weekRecord.losses;
+      weekRecord.winRate = weekTotal > 0 ? weekRecord.wins / weekTotal : 0;
+
+      stats.weeklyRecords = stats.weeklyRecords
+        .sort((a: any, b: any) => b.week.localeCompare(a.week))
+        .slice(0, 4);
+
+      localStorage.setItem(storageKey, JSON.stringify(stats));
+
+      // MOCK_USERS와 currentUser도 동기화
+      const userInDb = MOCK_USERS.find(u => u.id === currentUser.id);
+      if (userInDb) {
+        userInDb.pvpStats = {
+          wins: stats.wins,
+          losses: stats.losses,
+          totalGames: stats.totalGames,
+          winRate: stats.winRate,
+          weeklyRecords: stats.weeklyRecords,
+          lastUpdated: new Date(stats.lastUpdated)
+        };
+      }
+
+      currentUser.pvpStats = { ...userInDb?.pvpStats || {
+        wins: stats.wins,
+        losses: stats.losses,
+        totalGames: stats.totalGames,
+        winRate: stats.winRate,
+        weeklyRecords: stats.weeklyRecords,
+        lastUpdated: new Date(stats.lastUpdated)
+      }};
+
+      setCurrentUser({ ...currentUser });
+    }
   };
 
   return (

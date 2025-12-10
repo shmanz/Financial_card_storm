@@ -112,7 +112,7 @@ router.put('/:userId/stats', async (req, res) => {
   }
 });
 
-// 랭킹 조회
+// 랭킹 조회 (실시간 순위 변동 반영)
 router.get('/ranking', async (req, res) => {
   try {
     const { week } = req.query;
@@ -121,30 +121,40 @@ router.get('/ranking', async (req, res) => {
       return res.status(400).json({ error: 'week 파라미터가 필요합니다.' });
     }
     
+    // 주간 기록이 없는 경우 전체 통계로 랭킹 생성
     const result = await db.query(
       `SELECT 
         u.id,
         u.name,
-        wr.wins,
-        wr.losses,
-        wr.win_rate,
-        (wr.wins + wr.losses) as total_games
-       FROM weekly_records wr
-       JOIN users u ON u.id = wr.user_id
-       WHERE wr.week = $1 AND (wr.wins + wr.losses) >= 1
-       ORDER BY wr.win_rate DESC, total_games DESC
-       LIMIT 3`,
+        COALESCE(wr.wins, ps.wins, 0) as wins,
+        COALESCE(wr.losses, ps.losses, 0) as losses,
+        COALESCE(wr.win_rate, ps.win_rate, 0) as win_rate,
+        COALESCE((wr.wins + wr.losses), ps.total_games, 0) as total_games
+       FROM users u
+       LEFT JOIN weekly_records wr ON u.id = wr.user_id AND wr.week = $1
+       LEFT JOIN pvp_stats ps ON u.id = ps.user_id
+       WHERE (COALESCE(wr.wins, ps.wins, 0) + COALESCE(wr.losses, ps.losses, 0)) >= 1
+       ORDER BY 
+         COALESCE(wr.win_rate, ps.win_rate, 0) DESC,
+         COALESCE((wr.wins + wr.losses), ps.total_games, 0) DESC,
+         COALESCE(wr.wins, ps.wins, 0) DESC
+       LIMIT 10`,
       [week]
     );
     
     const ranking = result.rows.map(row => ({
       userId: row.id,
       userName: row.name,
-      wins: row.wins,
-      losses: row.losses,
+      wins: Number(row.wins),
+      losses: Number(row.losses),
       winRate: Number(row.win_rate),
       totalGames: Number(row.total_games)
     }));
+    
+    console.log(`[API] 랭킹 조회 (${week}):`, ranking.length, '명');
+    ranking.forEach((entry, idx) => {
+      console.log(`  ${idx + 1}위: ${entry.userName} - ${entry.wins}승 ${entry.losses}패 (승률: ${(entry.winRate * 100).toFixed(1)}%)`);
+    });
     
     res.json(ranking);
   } catch (error) {
