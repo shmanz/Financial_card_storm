@@ -7,19 +7,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: false,
-    // Rollup native dependencies 문제 해결
-    rollupOptions: {
-      output: {
-        manualChunks: undefined
-      }
-    }
+    sourcemap: false
   },
   server: {
     port: 5173
-  },
-  // Optional dependencies 강제 설치
-  optimizeDeps: {
-    include: ['rollup']
   }
 });
