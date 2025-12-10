@@ -366,6 +366,42 @@ app.get('/api/rooms', (req, res) => {
 
 // 사용자 관련 API (데이터베이스 연동)
 if (process.env.DATABASE_URL) {
+  const db = require('./db');
+  const fs = require('fs');
+  const path = require('path');
+  
+  // 데이터베이스 테이블 자동 생성 (서버 시작 시)
+  (async () => {
+    try {
+      const schemaPath = path.join(__dirname, 'schema.sql');
+      const schemaSQL = fs.readFileSync(schemaPath, 'utf8');
+      
+      // SQL 문을 세미콜론으로 분리하여 실행
+      const statements = schemaSQL
+        .split(';')
+        .map(s => s.trim())
+        .filter(s => s.length > 0 && !s.startsWith('--'));
+      
+      for (const statement of statements) {
+        if (statement.length > 0) {
+          try {
+            await db.query(statement);
+          } catch (err) {
+            // 테이블이 이미 존재하는 경우 무시
+            if (!err.message.includes('already exists') && !err.message.includes('duplicate')) {
+              console.warn('[DB] 스키마 실행 경고:', err.message);
+            }
+          }
+        }
+      }
+      
+      console.log('[DB] ✅ 데이터베이스 테이블 자동 생성 완료');
+    } catch (error) {
+      console.error('[DB] ❌ 테이블 자동 생성 실패:', error.message);
+      console.log('[DB] 💡 Railway Query 탭에서 수동으로 schema.sql을 실행해주세요.');
+    }
+  })();
+  
   const usersRouter = require('./api/users');
   const cardsRouter = require('./api/cards');
   const pvpRouter = require('./api/pvp');
