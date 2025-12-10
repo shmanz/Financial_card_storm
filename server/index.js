@@ -373,31 +373,78 @@ if (process.env.DATABASE_URL) {
   // 데이터베이스 테이블 자동 생성 (서버 시작 시)
   (async () => {
     try {
+      console.log('[DB] 🔄 데이터베이스 테이블 생성 시작...');
       const schemaPath = path.join(__dirname, 'schema.sql');
+      
+      // 파일 존재 확인
+      if (!fs.existsSync(schemaPath)) {
+        console.error('[DB] ❌ schema.sql 파일을 찾을 수 없습니다:', schemaPath);
+        console.log('[DB] 💡 Railway Query 탭에서 수동으로 SQL을 실행해주세요.');
+        return;
+      }
+      
       const schemaSQL = fs.readFileSync(schemaPath, 'utf8');
+      console.log('[DB] 📄 schema.sql 파일 로드 완료');
       
       // SQL 문을 세미콜론으로 분리하여 실행
       const statements = schemaSQL
         .split(';')
         .map(s => s.trim())
-        .filter(s => s.length > 0 && !s.startsWith('--'));
+        .filter(s => s.length > 0 && !s.startsWith('--') && !s.toLowerCase().startsWith('create index'));
+      
+      let successCount = 0;
+      let errorCount = 0;
       
       for (const statement of statements) {
         if (statement.length > 0) {
           try {
             await db.query(statement);
+            successCount++;
+            // 테이블 이름 추출하여 로그 출력
+            const tableMatch = statement.match(/CREATE TABLE.*?(\w+)/i);
+            if (tableMatch) {
+              console.log(`[DB] ✅ 테이블 생성: ${tableMatch[1]}`);
+            }
           } catch (err) {
             // 테이블이 이미 존재하는 경우 무시
-            if (!err.message.includes('already exists') && !err.message.includes('duplicate')) {
-              console.warn('[DB] 스키마 실행 경고:', err.message);
+            if (err.message.includes('already exists') || err.message.includes('duplicate')) {
+              const tableMatch = statement.match(/CREATE TABLE.*?(\w+)/i);
+              if (tableMatch) {
+                console.log(`[DB] ℹ️  테이블 이미 존재: ${tableMatch[1]}`);
+              }
+            } else {
+              errorCount++;
+              console.error('[DB] ❌ 스키마 실행 에러:', err.message);
+              console.error('[DB] SQL:', statement.substring(0, 100) + '...');
             }
           }
         }
       }
       
-      console.log('[DB] ✅ 데이터베이스 테이블 자동 생성 완료');
+      // 인덱스 생성 (별도로 처리)
+      const indexStatements = schemaSQL
+        .split(';')
+        .map(s => s.trim())
+        .filter(s => s.length > 0 && s.toLowerCase().startsWith('create index'));
+      
+      for (const statement of indexStatements) {
+        try {
+          await db.query(statement);
+          const indexMatch = statement.match(/CREATE INDEX.*?(\w+)/i);
+          if (indexMatch) {
+            console.log(`[DB] ✅ 인덱스 생성: ${indexMatch[1]}`);
+          }
+        } catch (err) {
+          if (!err.message.includes('already exists')) {
+            console.warn('[DB] ⚠️  인덱스 생성 경고:', err.message);
+          }
+        }
+      }
+      
+      console.log(`[DB] ✅ 데이터베이스 테이블 자동 생성 완료 (성공: ${successCount}, 에러: ${errorCount})`);
     } catch (error) {
       console.error('[DB] ❌ 테이블 자동 생성 실패:', error.message);
+      console.error('[DB] 스택:', error.stack);
       console.log('[DB] 💡 Railway Query 탭에서 수동으로 schema.sql을 실행해주세요.');
     }
   })();
