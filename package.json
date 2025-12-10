@@ -9,7 +9,8 @@
     "lint": "echo \"no lint configured\"",
     "server": "nodemon",
     "dev:full": "concurrently \"npm run dev\" \"npm run server\"",
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "postinstall": "npm rebuild || true"
   },
   "dependencies": {
     "cors": "^2.8.5",
