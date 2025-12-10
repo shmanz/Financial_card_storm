@@ -8,39 +8,64 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
-import { getCurrentWeekRanking, checkAndAwardWeeklyReward, createHallOfFameRewardCard, getWeekNumber } from '../utils/hallOfFame';
+import { getCurrentWeekRanking, createHallOfFameRewardCard, getWeekNumber } from '../utils/hallOfFame';
 import { UserProfile } from '../data/mockUsers';
 
 interface HallOfFameProps {
   onClose: () => void;
 }
 
+interface RankingEntry {
+  user: UserProfile;
+  wins: number;
+  losses: number;
+  winRate: number;
+  totalGames: number;
+}
+
 export const HallOfFame: React.FC<HallOfFameProps> = ({ onClose }) => {
   const { currentUser, addPurchasedProduct } = useAuth();
-  const [ranking, setRanking] = useState<ReturnType<typeof getCurrentWeekRanking>>([]);
+  const [ranking, setRanking] = useState<RankingEntry[]>([]);
   const [currentWeek, setCurrentWeek] = useState<string>('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const week = getWeekNumber(new Date());
-    setCurrentWeek(week);
-    
-    // 주차별 보상 확인 및 지급
-    const reward = checkAndAwardWeeklyReward();
-    if (reward.rewarded && reward.userId === currentUser?.id) {
-      // 보상 카드 지급
-      const rewardCard = createHallOfFameRewardCard(week);
-      if (currentUser && addPurchasedProduct) {
-        addPurchasedProduct(reward.rewardCardId || '', rewardCard);
+    const loadRanking = async () => {
+      setLoading(true);
+      const week = getWeekNumber(new Date());
+      setCurrentWeek(week);
+      
+      try {
+        // DB에서 랭킹 조회
+        const rankingData = await getCurrentWeekRanking();
+        setRanking(rankingData);
+        
+        // 주차별 보상 확인 및 지급 (1위인 경우)
+        if (rankingData.length > 0 && rankingData[0].user.id === currentUser?.id) {
+          const firstPlace = rankingData[0];
+          const rewardCardId = `hall-of-fame-${week}`;
+          
+          // 이미 보상을 받았는지 확인 (나중에 DB에서 확인하도록 개선 필요)
+          if (!currentUser?.hallOfFameRewards?.includes(rewardCardId)) {
+            const rewardCard = createHallOfFameRewardCard(week);
+            if (currentUser && addPurchasedProduct) {
+              addPurchasedProduct(rewardCardId, rewardCard);
+              alert(`🏆 축하합니다! ${week} 주간 1위 보상을 획득했습니다!\n\n카드: ${rewardCard.name}`);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[명예의 전당] 랭킹 로드 에러:', error);
+      } finally {
+        setLoading(false);
       }
-      alert(`🏆 축하합니다! ${week} 주간 1위 보상을 획득했습니다!\n\n카드: ${rewardCard.name}`);
-    }
+    };
     
-    // 랭킹 업데이트
-    setRanking(getCurrentWeekRanking());
+    loadRanking();
     
     // 주기적으로 랭킹 갱신 (30초마다)
     const interval = setInterval(() => {
-      setRanking(getCurrentWeekRanking());
+      loadRanking();
     }, 30000);
     
     return () => clearInterval(interval);
@@ -126,7 +151,11 @@ export const HallOfFame: React.FC<HallOfFameProps> = ({ onClose }) => {
             <div className="w-20 text-center">승률</div>
           </div>
 
-          {ranking.length === 0 ? (
+          {loading ? (
+            <div className="py-8 text-center text-slate-400">
+              랭킹을 불러오는 중...
+            </div>
+          ) : ranking.length === 0 ? (
             <div className="py-8 text-center text-slate-400">
               아직 경기 기록이 없습니다.
               <div className="mt-2 text-xs text-slate-500">
